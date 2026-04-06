@@ -1,3 +1,4 @@
+import WalaupLoader from '@/components/layout/WalaupLoader'
 import { Space_Grotesk, Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/layout/Navbar'
@@ -67,6 +68,9 @@ export default function RootLayout({ children }) {
       className={`${spaceGrotesk.variable} ${inter.variable} ${jetbrainsMono.variable}`}
     >
       <head>
+          <link rel="manifest" href="/manifest.json" />
+          <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+          <meta name="theme-color" content="#080B14" />
         {/*
           Bridge next/font CSS variables → our design token system.
           --font-display/body/mono are consumed throughout globals.css.
@@ -92,6 +96,7 @@ export default function RootLayout({ children }) {
         {/* ── UI chrome ── */}
         <div id="scroll-progress" className="scroll-progress" aria-hidden="true" />
         <div id="cursor-glow" className="cursor-glow" aria-hidden="true" />
+        <WalaupLoader />
 
         {/* ── Navigation ── */}
         <Navbar />

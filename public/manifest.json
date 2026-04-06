@@ -1,17 +1,22 @@
 {
-  "name": "Walaup",
+  "name": "Walaup — Apps sur mesure Tunisie",
   "short_name": "Walaup",
-  "description": "Apps sur mesure pour entreprises tunisiennes",
+  "description": "Créez votre application mobile et web sur mesure avec Walaup, l'agence d'apps tunisienne.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#080B14",
-  "theme_color": "#6366F1",
+  "theme_color": "#080B14",
+  "orientation": "portrait-primary",
+  "lang": "fr",
   "icons": [
     {
       "src": "/favicon.svg",
-      "sizes": "any",
       "type": "image/svg+xml",
+      "sizes": "any",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "screenshots": [],
+  "categories": ["business", "productivity"],
+  "prefer_related_applications": false
 }
