@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
+import { Store } from 'lucide-react'
 
 const NAV_LINKS = [
   { href: '/#problems',     label: 'Pourquoi nous' },
@@ -26,10 +27,8 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [handleScroll])
 
-  // Close mobile menu on route change
   useEffect(() => { setMenuOpen(false) }, [pathname])
 
-  // Prevent body scroll when mobile menu is open
   useEffect(() => {
     document.body.style.overflow = menuOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
@@ -43,6 +42,28 @@ export default function Navbar() {
 
   return (
     <>
+      <style>{`
+        @keyframes gold-pulse {
+          0%, 100% { opacity: 1; filter: drop-shadow(0 0 4px #F59E0B); }
+          50%       { opacity: 0.45; filter: drop-shadow(0 0 1px #F59E0B); }
+        }
+        .marketplace-icon {
+          animation: gold-pulse 2s ease-in-out infinite;
+          flex-shrink: 0;
+        }
+        .marketplace-link {
+          display: flex !important;
+          align-items: center;
+          gap: 5px;
+          font-weight: 600 !important;
+          color: #F59E0B !important;
+        }
+        .marketplace-link:hover {
+          background: rgba(245,158,11,0.10) !important;
+          color: #FCD34D !important;
+        }
+      `}</style>
+
       <nav className={`navbar${scrolled ? ' navbar--scrolled' : ''}`} role="navigation" aria-label="Navigation principale">
         <div className="navbar__inner">
 
@@ -55,15 +76,18 @@ export default function Navbar() {
           <ul className="nav-links" role="list">
             {NAV_LINKS.map(link => (
               <li key={link.href}>
-                <Link
-                  href={link.href}
-                  className="nav-link"
-                  onClick={playClick}
-                >
+                <Link href={link.href} className="nav-link" onClick={playClick}>
                   {link.label}
                 </Link>
               </li>
             ))}
+            {/* Marketplace — gold + blink */}
+            <li>
+              <Link href="/marketplace" className="nav-link marketplace-link" onClick={playClick}>
+                <Store size={14} className="marketplace-icon" color="#F59E0B" strokeWidth={2.2} />
+                Marketplace
+              </Link>
+            </li>
           </ul>
 
           {/* Desktop actions */}
@@ -100,15 +124,17 @@ export default function Navbar() {
         aria-label="Menu mobile"
       >
         {NAV_LINKS.map(link => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className="nav-link"
-            onClick={() => { setMenuOpen(false); playClick() }}
-          >
+          <Link key={link.href} href={link.href} className="nav-link"
+            onClick={() => { setMenuOpen(false); playClick() }}>
             {link.label}
           </Link>
         ))}
+        {/* Marketplace mobile */}
+        <Link href="/marketplace" className="nav-link marketplace-link"
+          onClick={() => { setMenuOpen(false); playClick() }}>
+          <Store size={15} className="marketplace-icon" color="#F59E0B" strokeWidth={2.2} />
+          Marketplace
+        </Link>
 
         <div className="nav-actions">
           <Link href="/client" className="btn btn-ghost" onClick={() => { setMenuOpen(false); playClick() }}>

@@ -612,9 +612,9 @@ export default function Home() {
           </div>
           <div className="packs-grid" data-stagger style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:20, marginBottom:20 }}>
             {PACKS.map(pack => (
-              <div key={pack.name} data-animate style={{ position:'relative' }}>
+              <div key={pack.name} data-animate style={{ position:'relative', display:'flex', flexDirection:'column' }}>
                 {pack.badge && <div style={{ position:'absolute', top:-13, left:'50%', transform:'translateX(-50%)', background:pack.badgeBg, color:pack.badgeTx, fontSize:11, fontWeight:700, padding:'4px 16px', borderRadius:20, whiteSpace:'nowrap', zIndex:2 }}>{pack.badge}</div>}
-                <div className="card" style={{ padding:'32px 24px', height:'100%', border:pack.name==='Pro'?'1px solid rgba(139,92,246,0.45)':pack.name==='Partenaire'?'1px solid rgba(245,158,11,0.35)':'1px solid var(--border)', background:pack.name==='Pro'?'linear-gradient(160deg,rgba(99,102,241,.06),rgba(139,92,246,.04))':pack.name==='Partenaire'?'linear-gradient(160deg,rgba(245,158,11,.05),rgba(251,191,36,.03))':undefined }}>
+                <div className="card" style={{ padding:'32px 24px', flex:1, display:'flex', flexDirection:'column', border:pack.name==='Pro'?'1px solid rgba(139,92,246,0.45)':pack.name==='Partenaire'?'1px solid rgba(245,158,11,0.35)':'1px solid var(--border)', background:pack.name==='Pro'?'linear-gradient(160deg,rgba(99,102,241,.06),rgba(139,92,246,.04))':pack.name==='Partenaire'?'linear-gradient(160deg,rgba(245,158,11,.05),rgba(251,191,36,.03))':undefined }}>
                   <h3 style={{ fontFamily:'var(--font-display)', fontSize:22, fontWeight:700, color:'var(--tx)', marginBottom:4 }}>{pack.name}</h3>
                   <div style={{ fontSize:13, color:'var(--tx-2)', marginBottom:18 }}>{pack.target}</div>
                   <div style={{ marginBottom:6 }}>
@@ -622,7 +622,7 @@ export default function Home() {
                     <span style={{ fontSize:14, color:'var(--tx-3)', marginLeft:4 }}>DT</span>
                   </div>
                   <div style={{ fontSize:13, color:'var(--tx-3)', marginBottom:22 }}>+{pack.monthly} DT/mois</div>
-                  <div style={{ marginBottom:20 }}>
+                  <div style={{ marginBottom:20, flex:1 }}>
                     {pack.features.map(f => (
                       <div key={f} style={{ display:'flex', gap:8, alignItems:'flex-start', marginBottom:8, fontSize:13, color:'var(--tx-2)' }}>
                         <CheckCircle2 size={14} color={pack.color} strokeWidth={2.5} style={{ flexShrink:0, marginTop:1 }}/>{f}
@@ -635,7 +635,7 @@ export default function Home() {
                     ))}
                   </div>
                   {pack.name==='Partenaire' && <RevenueSimulator />}
-                  <button onClick={scrollToContact} className={`btn ${pack.name==='Pro'?'btn-primary':'btn-ghost'}`} style={{ width:'100%', marginTop:20 }}>Choisir {pack.name}</button>
+                  <button onClick={scrollToContact} className={`btn ${pack.name==='Pro'?'btn-primary':'btn-ghost'}`} style={{ width:'100%', marginTop:'auto', paddingTop:16 }}>Choisir {pack.name}</button>
                 </div>
               </div>
             ))}
@@ -661,7 +661,7 @@ export default function Home() {
       {/* ══ 11. AUTH ═════════════════════════════════════════════════ */}
       <section id="contact" style={{ padding:'80px 0' }}>
         <div className="container">
-          <div className="auth-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:72, alignItems:'start', maxWidth:940, margin:'0 auto' }}>
+          <div className="auth-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:72, alignItems:'center', maxWidth:940, margin:'0 auto' }}>
             <div data-animate>
               {tag(LogIn, 'Commencer maintenant')}
               <h2 style={{ ...H2, fontSize:'clamp(1.8rem,2.5vw,2.6rem)' }}>Accédez à votre espace client</h2>
@@ -680,7 +680,7 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <div data-animate className="card" style={{ padding:32 }}><AuthSection /></div>
+            <div data-animate className="card" style={{ padding:32, alignSelf:'center' }}><AuthSection /></div>
           </div>
         </div>
       </section>
