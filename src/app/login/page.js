@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { WalaupSound } from '@/lib/sound'
-import { Mail, Lock, Eye, EyeOff, User, ArrowRight, Chrome, Shield } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, User, ArrowRight, Globe, Shield } from 'lucide-react'
 
 // ─── Security note ────────────────────────────────────────────────────────────
 // - All inputs have maxLength to prevent oversized payloads
@@ -512,7 +512,7 @@ export default function LoginPage() {
           <button className="lp-btn lp-btn--google" onClick={handleGoogle} disabled={loading || googleLoading}>
             {googleLoading
               ? <span className="lp-spinner" style={{ borderColor:'rgba(99,102,241,.3)', borderTopColor:'var(--ac)' }} />
-              : <><Chrome size={16} /> Continuer avec Google</>
+              : <><Globe size={16} /> Continuer avec Google</>
             }
           </button>
 

@@ -6,8 +6,7 @@ import { WalaupSound } from '@/lib/sound'
 import ClientSidebar from '@/components/client/ClientSidebar'
 import ClientBottomTabs from '@/components/client/ClientBottomTabs'
 import TabProjet from '@/components/client/tabs/TabProjet'
-import { TabMessages } from '@/components/client/tabs'
-// Re-use the single-file exports for the simpler tabs
+import TabMessages from '@/components/client/tabs/TabMessages'
 import { TabAbonnement, TabPaiements, TabApps } from '@/components/client/tabs/index.js'
 
 // ─── Security notes ───────────────────────────────────────────────────────────
