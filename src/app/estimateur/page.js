@@ -3,8 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { WalaupSound } from '@/lib/sound'
-import Navbar from '@/components/layout/Navbar'
-import Footer from '@/components/layout/Footer'
 import {
   Coffee, Stethoscope, ShoppingBag, Wrench, GraduationCap, MoreHorizontal,
   Users, Globe, Smartphone, Monitor, Check, ChevronRight, ChevronLeft,
@@ -903,8 +901,6 @@ export default function EstimateurPage() {
         }
       `}</style>
 
-      <Navbar />
-
       {/* Page wrapper */}
       <main style={{ minHeight: '100vh', background: 'var(--bg-base)', paddingTop: 80, paddingBottom: 80 }}>
 
@@ -1029,7 +1025,6 @@ export default function EstimateurPage() {
         )}
       </main>
 
-      <Footer />
     </>
   )
 }
