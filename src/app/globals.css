@@ -355,7 +355,7 @@ h6 { font-size: var(--text-base); }
   top: 20%;
   left: 45%;
   background: radial-gradient(circle, var(--gold) 0%, transparent 70%);
-  opacity: 0.055;
+  opacity: 0.010;
   animation: aurora-float-2 28s ease-in-out infinite reverse;
   animation-delay: -5s;
 }
