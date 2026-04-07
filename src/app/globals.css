@@ -667,10 +667,7 @@ h6 { font-size: var(--text-base); }
   pointer-events: none;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   GLOBALS.CSS — REMPLACER tout le bloc /* ── 9. CARDS ── * /
-   ───────────────────────────────────────────────────────────────── */
- 
+/* ── 9. CARDS ──────────────────────────────────────────────── */
 .card {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -678,12 +675,12 @@ h6 { font-size: var(--text-base); }
   padding: var(--space-6);
   position: relative;
   overflow: hidden;
-  transition:
-    transform     var(--dur-base) var(--ease-out-expo),
-    box-shadow    var(--dur-base) var(--ease-out-expo),
-    border-color  var(--dur-base);
+  transition: transform var(--dur-base) var(--ease-out-expo),
+              box-shadow var(--dur-base) var(--ease-out-expo),
+              border-color var(--dur-base);
 }
- 
+
+/* Spotlight large — glow indigo suit la souris */
 .card::before {
   content: '';
   position: absolute;
@@ -699,11 +696,8 @@ h6 { font-size: var(--text-base); }
   );
   transition: opacity 300ms ease;
 }
- 
-.card._spotlight-active::before {
-  opacity: 1;
-}
- 
+
+/* Spotlight concentré — halo violet au centre du curseur */
 .card::after {
   content: '';
   position: absolute;
@@ -713,38 +707,36 @@ h6 { font-size: var(--text-base); }
   z-index: 0;
   opacity: 0;
   background: radial-gradient(
-    220px circle at var(--mx, 50%) var(--my, 50%),
-    rgba(139, 92, 246, 0.22),
+    200px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(139, 92, 246, 0.20),
     transparent 55%
   );
   transition: opacity 250ms ease;
   mix-blend-mode: screen;
 }
- 
-.card._spotlight-active::after {
-  opacity: 1;
-}
- 
-.card > * {
-  position: relative;
-  z-index: 1;
-}
- 
+
+/* Activer le spotlight quand la souris est sur la carte */
+.card._spotlight-active::before { opacity: 1; }
+.card._spotlight-active::after  { opacity: 1; }
+
+/* Le contenu doit rester au-dessus des pseudo-éléments */
+.card > * { position: relative; z-index: 1; }
+
 .card--interactive {
   cursor: pointer;
 }
- 
 .card--interactive:hover {
   transform: translateY(-3px);
   box-shadow: var(--shadow-xl);
   border-color: rgba(99, 102, 241, 0.35);
 }
- 
+
 .card--glow:hover {
   box-shadow: var(--shadow-xl), var(--shadow-glow);
   border-color: var(--border-accent);
 }
- 
+
+/* Gold variant : couleurs ambre/or */
 .card--gold-glow::before {
   background: radial-gradient(
     500px circle at var(--mx, 50%) var(--my, 50%),
@@ -752,26 +744,25 @@ h6 { font-size: var(--text-base); }
     transparent 65%
   );
 }
- 
 .card--gold-glow::after {
   background: radial-gradient(
-    220px circle at var(--mx, 50%) var(--my, 50%),
-    rgba(251, 191, 36, 0.2),
+    200px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(251, 191, 36, 0.18),
     transparent 55%
   );
 }
- 
 .card--gold-glow:hover {
   box-shadow: var(--shadow-xl), var(--shadow-gold);
   border-color: var(--border-gold);
 }
- 
+
 .card--glass {
   background: var(--glass-md);
   backdrop-filter: var(--glass-blur);
   border-color: var(--glass-border);
 }
- 
+
+/* Card tilt 3D — controlled by JS */
 .card--tilt {
   transform-style: preserve-3d;
   will-change: transform;

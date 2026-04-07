@@ -46,21 +46,20 @@ export function initScrollAnimations() {
     .forEach((el) => _scrollObserver.observe(el))
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   ANIMATE.JS — REMPLACER initTiltCards() par ce bloc complet
-   Il gère à la fois le tilt 3D ET le spotlight lumineux.
-   ───────────────────────────────────────────────────────────────── */
- 
+/* ── 2. CARD SPOTLIGHT + 3D TILT ──────────────────────────── */
+/**
+ * Spotlight: radial glow that follows the mouse inside EVERY .card
+ * Tilt 3D: perspective effect on .card--tilt (desktop only)
+ */
 const _cardListeners = new WeakMap()
- 
+
 export function initTiltCards() {
   if (typeof window === 'undefined') return
   const isFine = window.matchMedia('(hover: hover) and (pointer: fine)').matches
- 
-  // ── Spotlight : toutes les .card (desktop + mobile)
+
   document.querySelectorAll('.card').forEach((card) => {
     if (_cardListeners.has(card)) return
- 
+
     const onMove = (e) => {
       const rect = card.getBoundingClientRect()
       const x = e.clientX - rect.left
@@ -68,8 +67,7 @@ export function initTiltCards() {
       card.style.setProperty('--mx', x + 'px')
       card.style.setProperty('--my', y + 'px')
       card.classList.add('_spotlight-active')
- 
-      // 3D tilt uniquement sur .card--tilt et desktop
+
       if (isFine && card.classList.contains('card--tilt')) {
         const dx = (x - rect.width  / 2) / (rect.width  / 2)
         const dy = (y - rect.height / 2) / (rect.height / 2)
@@ -77,14 +75,14 @@ export function initTiltCards() {
           `perspective(900px) rotateX(${dy * -6}deg) rotateY(${dx * 6}deg) translateZ(6px)`
       }
     }
- 
+
     const onLeave = () => {
       card.classList.remove('_spotlight-active')
       if (card.classList.contains('card--tilt')) {
         card.style.transform = ''
       }
     }
- 
+
     card.addEventListener('mousemove', onMove)
     card.addEventListener('mouseleave', onLeave)
     _cardListeners.set(card, { onMove, onLeave })
