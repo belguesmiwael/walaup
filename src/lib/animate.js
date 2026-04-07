@@ -46,35 +46,48 @@ export function initScrollAnimations() {
     .forEach((el) => _scrollObserver.observe(el))
 }
 
-/* ── 2. 3D TILT CARDS ─────────────────────────────────────── */
-/**
- * Applies a subtle 3D tilt perspective effect to .card--tilt elements.
- * Desktop only (hover-capable devices).
- */
-const _tiltListeners = new WeakMap()
-
+/* ─────────────────────────────────────────────────────────────────
+   ANIMATE.JS — REMPLACER initTiltCards() par ce bloc complet
+   Il gère à la fois le tilt 3D ET le spotlight lumineux.
+   ───────────────────────────────────────────────────────────────── */
+ 
+const _cardListeners = new WeakMap()
+ 
 export function initTiltCards() {
   if (typeof window === 'undefined') return
-  if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return
-
-  document.querySelectorAll('.card--tilt').forEach((card) => {
-    // Avoid duplicate listeners
-    if (_tiltListeners.has(card)) return
-
+  const isFine = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+ 
+  // ── Spotlight : toutes les .card (desktop + mobile)
+  document.querySelectorAll('.card').forEach((card) => {
+    if (_cardListeners.has(card)) return
+ 
     const onMove = (e) => {
       const rect = card.getBoundingClientRect()
-      const dx = (e.clientX - rect.left - rect.width / 2) / (rect.width / 2)
-      const dy = (e.clientY - rect.top - rect.height / 2) / (rect.height / 2)
-      card.style.transform = `perspective(900px) rotateX(${dy * -7}deg) rotateY(${dx * 7}deg) translateZ(8px)`
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      card.style.setProperty('--mx', x + 'px')
+      card.style.setProperty('--my', y + 'px')
+      card.classList.add('_spotlight-active')
+ 
+      // 3D tilt uniquement sur .card--tilt et desktop
+      if (isFine && card.classList.contains('card--tilt')) {
+        const dx = (x - rect.width  / 2) / (rect.width  / 2)
+        const dy = (y - rect.height / 2) / (rect.height / 2)
+        card.style.transform =
+          `perspective(900px) rotateX(${dy * -6}deg) rotateY(${dx * 6}deg) translateZ(6px)`
+      }
     }
-
+ 
     const onLeave = () => {
-      card.style.transform = ''
+      card.classList.remove('_spotlight-active')
+      if (card.classList.contains('card--tilt')) {
+        card.style.transform = ''
+      }
     }
-
+ 
     card.addEventListener('mousemove', onMove)
     card.addEventListener('mouseleave', onLeave)
-    _tiltListeners.set(card, { onMove, onLeave })
+    _cardListeners.set(card, { onMove, onLeave })
   })
 }
 
