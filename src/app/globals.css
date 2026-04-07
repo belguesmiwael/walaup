@@ -246,17 +246,27 @@ h6 { font-size: var(--text-base); }
 }
 
 .text-gradient-ac {
-  background: linear-gradient(135deg, var(--ac), var(--ac-2));
+  background: linear-gradient(135deg, var(--ac), var(--ac-2), var(--gold), var(--ac));
+  background-size: 300% 300%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  animation: hero-gradient-shift 6s ease-in-out infinite;
 }
 
 .text-gradient-gold {
-  background: linear-gradient(135deg, var(--gold), var(--gold-light));
+  background: linear-gradient(135deg, var(--gold), var(--gold-light), var(--ac-3), var(--gold));
+  background-size: 300% 300%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  animation: hero-gradient-shift 5s ease-in-out infinite;
+}
+
+@keyframes hero-gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 /* ── 4. LAYOUT SYSTEM ──────────────────────────────────────── */
@@ -305,8 +315,8 @@ h6 { font-size: var(--text-base); }
 .aurora-orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(100px);
-  opacity: 0.12;
+  filter: blur(120px);
+  opacity: 0.07;
   will-change: transform;
 }
 
@@ -340,13 +350,13 @@ h6 { font-size: var(--text-base); }
 }
 
 .aurora-orb--4 {
-  width: 300px;
-  height: 300px;
-  top: 30%;
-  left: 50%;
+  width: 400px;
+  height: 400px;
+  top: 20%;
+  left: 45%;
   background: radial-gradient(circle, var(--gold) 0%, transparent 70%);
-  opacity: 0.06;
-  animation: aurora-float-1 30s ease-in-out infinite reverse;
+  opacity: 0.055;
+  animation: aurora-float-2 28s ease-in-out infinite reverse;
   animation-delay: -5s;
 }
 
@@ -602,35 +612,64 @@ h6 { font-size: var(--text-base); }
 .btn-primary {
   background: linear-gradient(135deg, var(--ac), var(--ac-2));
   color: #fff;
-  box-shadow: 0 4px 20px var(--ac-glow), 0 1px 0 rgba(255,255,255,0.1) inset;
+  box-shadow:
+    0 4px 20px var(--ac-glow),
+    0 1px 0 rgba(255,255,255,0.12) inset,
+    0 0 0 1px rgba(255,255,255,0.06) inset;
+}
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.10) 0%, transparent 100%);
+  border-radius: inherit;
+  pointer-events: none;
 }
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px var(--ac-glow-strong);
+  box-shadow:
+    0 8px 32px var(--ac-glow-strong),
+    0 1px 0 rgba(255,255,255,0.15) inset;
 }
 .btn-primary:active { transform: translateY(0) scale(0.98); }
 
-/* Ghost */
+/* Ghost — glassmorphism */
 .btn-ghost {
-  background: transparent;
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(12px);
   color: var(--tx-2);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset;
 }
 .btn-ghost:hover {
-  background: var(--bg-hover);
-  border-color: var(--border-strong);
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.18);
   color: var(--tx);
+  box-shadow:
+    0 0 20px rgba(99,102,241,0.10),
+    0 1px 0 rgba(255,255,255,0.10) inset;
 }
 
 /* Gold */
 .btn-gold {
   background: linear-gradient(135deg, var(--gold), var(--gold-light));
-  color: var(--tx-inverse);
-  box-shadow: 0 4px 20px var(--gold-glow);
+  color: #080B14;
+  font-weight: 700;
+  box-shadow:
+    0 4px 20px var(--gold-glow),
+    0 1px 0 rgba(255,255,255,0.25) inset;
+}
+.btn-gold::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, transparent 100%);
+  border-radius: inherit;
+  pointer-events: none;
 }
 .btn-gold:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px var(--gold-glow);
+  box-shadow: 0 8px 30px rgba(245,158,11,0.45);
 }
 
 /* Icon only */
@@ -680,7 +719,7 @@ h6 { font-size: var(--text-base); }
               border-color var(--dur-base);
 }
 
-/* Spotlight large — glow indigo suit la souris */
+/* Spotlight large — glow indigo 500px suit la souris */
 .card::before {
   content: '';
   position: absolute;
@@ -691,13 +730,13 @@ h6 { font-size: var(--text-base); }
   opacity: 0;
   background: radial-gradient(
     500px circle at var(--mx, 50%) var(--my, 50%),
-    rgba(99, 102, 241, 0.13),
+    rgba(99, 102, 241, 0.12),
     transparent 65%
   );
-  transition: opacity 300ms ease;
+  transition: opacity 350ms ease;
 }
 
-/* Spotlight concentré — halo violet au centre du curseur */
+/* Spotlight concentré — halo violet+gold intense */
 .card::after {
   content: '';
   position: absolute;
@@ -707,28 +746,34 @@ h6 { font-size: var(--text-base); }
   z-index: 0;
   opacity: 0;
   background: radial-gradient(
-    200px circle at var(--mx, 50%) var(--my, 50%),
-    rgba(139, 92, 246, 0.20),
+    180px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(139, 92, 246, 0.22),
     transparent 55%
   );
-  transition: opacity 250ms ease;
+  transition: opacity 280ms ease;
   mix-blend-mode: screen;
 }
 
-/* Activer le spotlight quand la souris est sur la carte */
+/* Activation spotlight */
 .card._spotlight-active::before { opacity: 1; }
 .card._spotlight-active::after  { opacity: 1; }
+
+/* Inner glow — profondeur + bordure lumineuse au survol */
+.card._spotlight-active {
+  border-color: rgba(99, 102, 241, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(99, 102, 241, 0.10) inset,
+    0 4px 32px rgba(0, 0, 0, 0.40),
+    0 0 60px rgba(99, 102, 241, 0.06);
+}
 
 /* Le contenu doit rester au-dessus des pseudo-éléments */
 .card > * { position: relative; z-index: 1; }
 
-.card--interactive {
-  cursor: pointer;
-}
+.card--interactive { cursor: pointer; }
 .card--interactive:hover {
   transform: translateY(-3px);
   box-shadow: var(--shadow-xl);
-  border-color: rgba(99, 102, 241, 0.35);
 }
 
 .card--glow:hover {
@@ -736,20 +781,27 @@ h6 { font-size: var(--text-base); }
   border-color: var(--border-accent);
 }
 
-/* Gold variant : couleurs ambre/or */
+/* Gold variant */
 .card--gold-glow::before {
   background: radial-gradient(
     500px circle at var(--mx, 50%) var(--my, 50%),
-    rgba(245, 158, 11, 0.13),
+    rgba(245, 158, 11, 0.12),
     transparent 65%
   );
 }
 .card--gold-glow::after {
   background: radial-gradient(
-    200px circle at var(--mx, 50%) var(--my, 50%),
-    rgba(251, 191, 36, 0.18),
+    180px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(251, 191, 36, 0.22),
     transparent 55%
   );
+}
+.card--gold-glow._spotlight-active {
+  border-color: rgba(245, 158, 11, 0.30);
+  box-shadow:
+    0 0 0 1px rgba(245, 158, 11, 0.08) inset,
+    0 4px 32px rgba(0, 0, 0, 0.40),
+    0 0 60px rgba(245, 158, 11, 0.06);
 }
 .card--gold-glow:hover {
   box-shadow: var(--shadow-xl), var(--shadow-gold);
@@ -762,7 +814,7 @@ h6 { font-size: var(--text-base); }
   border-color: var(--glass-border);
 }
 
-/* Card tilt 3D — controlled by JS */
+/* Tilt 3D — controlled by JS */
 .card--tilt {
   transform-style: preserve-3d;
   will-change: transform;
@@ -1057,6 +1109,10 @@ textarea.input {
 
 .divider--glow {
   background: linear-gradient(90deg, transparent, var(--ac-glow), transparent);
+}
+
+.divider--gold {
+  background: linear-gradient(90deg, transparent, rgba(245,158,11,0.35), transparent);
 }
 
 /* ── 15. SECTION HEADERS ───────────────────────────────────── */

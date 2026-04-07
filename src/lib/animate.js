@@ -46,47 +46,97 @@ export function initScrollAnimations() {
     .forEach((el) => _scrollObserver.observe(el))
 }
 
-/* ── 2. CARD SPOTLIGHT + 3D TILT ──────────────────────────── */
+/* ── 2. CARD SPOTLIGHT + TILT + MOBILE SCROLL ACTIVATION ─── */
 /**
- * Spotlight: radial glow that follows the mouse inside EVERY .card
- * Tilt 3D: perspective effect on .card--tilt (desktop only)
+ * Desktop : mouse-tracking spotlight (radial glow + inner depth)
+ * Mobile  : IntersectionObserver active le spotlight au scroll
+ *           descente → active, remontée → désactive
  */
 const _cardListeners = new WeakMap()
+let   _lastScrollY   = 0
+let   _mobileObserver = null
 
 export function initTiltCards() {
   if (typeof window === 'undefined') return
-  const isFine = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+
+  const isFine   = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  const isMobile = !isFine
+
+  /* ── Desktop : mouse-tracking ── */
+  if (isFine) {
+    document.querySelectorAll('.card').forEach((card) => {
+      if (_cardListeners.has(card)) return
+
+      const onMove = (e) => {
+        const rect = card.getBoundingClientRect()
+        const x = e.clientX - rect.left
+        const y = e.clientY - rect.top
+        card.style.setProperty('--mx', x + 'px')
+        card.style.setProperty('--my', y + 'px')
+        card.classList.add('_spotlight-active')
+
+        if (card.classList.contains('card--tilt')) {
+          const dx = (x - rect.width  / 2) / (rect.width  / 2)
+          const dy = (y - rect.height / 2) / (rect.height / 2)
+          card.style.transform =
+            `perspective(900px) rotateX(${dy * -6}deg) rotateY(${dx * 6}deg) translateZ(6px)`
+        }
+      }
+
+      const onLeave = () => {
+        card.classList.remove('_spotlight-active')
+        if (card.classList.contains('card--tilt')) card.style.transform = ''
+      }
+
+      card.addEventListener('mousemove', onMove, { passive: true })
+      card.addEventListener('mouseleave', onLeave)
+      _cardListeners.set(card, { onMove, onLeave })
+    })
+    return
+  }
+
+  /* ── Mobile : IntersectionObserver + direction scroll ── */
+  if (_mobileObserver) _mobileObserver.disconnect()
+
+  // Mettre le centre du spotlight au centre de chaque carte
+  document.querySelectorAll('.card').forEach((card) => {
+    card.style.setProperty('--mx', '50%')
+    card.style.setProperty('--my', '50%')
+  })
+
+  _mobileObserver = new IntersectionObserver(
+    (entries) => {
+      const scrollingDown = window.scrollY >= _lastScrollY
+
+      entries.forEach((entry) => {
+        const card = entry.target
+        if (entry.isIntersecting && scrollingDown) {
+          // Carte entre dans le viewport en descendant → activer
+          card.classList.add('_spotlight-active')
+        } else if (!entry.isIntersecting && !scrollingDown) {
+          // Carte sort du viewport en remontant → désactiver
+          card.classList.remove('_spotlight-active')
+        } else if (!entry.isIntersecting) {
+          card.classList.remove('_spotlight-active')
+        }
+      })
+
+      _lastScrollY = window.scrollY
+    },
+    {
+      threshold: 0.25,
+      rootMargin: '0px 0px -10% 0px',
+    }
+  )
 
   document.querySelectorAll('.card').forEach((card) => {
-    if (_cardListeners.has(card)) return
-
-    const onMove = (e) => {
-      const rect = card.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
-      card.style.setProperty('--mx', x + 'px')
-      card.style.setProperty('--my', y + 'px')
-      card.classList.add('_spotlight-active')
-
-      if (isFine && card.classList.contains('card--tilt')) {
-        const dx = (x - rect.width  / 2) / (rect.width  / 2)
-        const dy = (y - rect.height / 2) / (rect.height / 2)
-        card.style.transform =
-          `perspective(900px) rotateX(${dy * -6}deg) rotateY(${dx * 6}deg) translateZ(6px)`
-      }
-    }
-
-    const onLeave = () => {
-      card.classList.remove('_spotlight-active')
-      if (card.classList.contains('card--tilt')) {
-        card.style.transform = ''
-      }
-    }
-
-    card.addEventListener('mousemove', onMove)
-    card.addEventListener('mouseleave', onLeave)
-    _cardListeners.set(card, { onMove, onLeave })
+    _mobileObserver.observe(card)
   })
+
+  // Tracker la direction du scroll
+  window.addEventListener('scroll', () => {
+    _lastScrollY = window.scrollY
+  }, { passive: true })
 }
 
 /* ── 3. MAGNETIC BUTTONS ──────────────────────────────────── */

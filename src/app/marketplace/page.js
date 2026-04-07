@@ -137,35 +137,35 @@ const CSS = `
     50%     { opacity:1;  transform:scale(1); }
   }
 
-  /* ── Page wrapper ── */
+  /* ── Page wrapper — transparent, body gère le fond ── */
   .mp-page {
     position:relative;
     min-height:100vh;
-    background:#080B14;           /* bleu nuit — jamais #000 */
+    background:transparent;
     overflow-x:hidden;
   }
 
   /* ── Aurora orbs — fixed behind everything ── */
   .mp-aurora-1, .mp-aurora-2, .mp-aurora-3 {
     position:fixed; border-radius:50%; pointer-events:none; z-index:0;
-    filter:blur(80px);
+    filter:blur(55px);
   }
   .mp-aurora-1 {
-    width:70vw; height:60vh;
-    top:0; left:50%;
-    background:radial-gradient(ellipse, rgba(99,102,241,.13) 0%, rgba(139,92,246,.07) 40%, transparent 70%);
+    width:75vw; height:65vh;
+    top:-5%; left:50%;
+    background:radial-gradient(ellipse, rgba(99,102,241,.28) 0%, rgba(139,92,246,.14) 40%, transparent 70%);
     animation:mp-aurora-1 20s ease-in-out infinite alternate;
   }
   .mp-aurora-2 {
-    width:50vw; height:50vh;
-    top:20vh; right:0;
-    background:radial-gradient(ellipse, rgba(139,92,246,.1) 0%, transparent 70%);
+    width:55vw; height:55vh;
+    top:15vh; right:-5%;
+    background:radial-gradient(ellipse, rgba(139,92,246,.22) 0%, transparent 70%);
     animation:mp-aurora-2 15s ease-in-out infinite alternate;
   }
   .mp-aurora-3 {
-    width:40vw; height:40vh;
-    bottom:10vh; left:0;
-    background:radial-gradient(ellipse, rgba(34,211,238,.07) 0%, transparent 70%);
+    width:45vw; height:45vh;
+    bottom:5vh; left:-5%;
+    background:radial-gradient(ellipse, rgba(34,211,238,.16) 0%, transparent 70%);
     animation:mp-aurora-3 18s ease-in-out infinite alternate;
   }
 
@@ -183,10 +183,10 @@ const CSS = `
 
   /* ── Cards ── */
   .mp-card {
-    position:relative; background:rgba(13,17,32,.82);
-    border:1px solid rgba(255,255,255,.07); border-radius:20px;
+    position:relative; background:rgba(13,17,32,.45);
+    border:1px solid rgba(255,255,255,.09); border-radius:20px;
     overflow:hidden; cursor:pointer;
-    backdrop-filter:blur(12px);
+    backdrop-filter:blur(16px);
     transition:border-color .26s ease, transform .26s cubic-bezier(.16,1,.3,1), box-shadow .26s ease;
     animation:mp-up .45s cubic-bezier(.16,1,.3,1) both;
   }
@@ -230,11 +230,11 @@ const CSS = `
   /* Search */
   .mp-search-wrap { position:relative; }
   .mp-search-inp {
-    width:100%; padding:.82rem 2.8rem; background:rgba(13,17,32,.7);
-    border:1px solid rgba(255,255,255,.1); border-radius:14px;
+    width:100%; padding:.82rem 2.8rem; background:rgba(13,17,32,.4);
+    border:1px solid rgba(255,255,255,.12); border-radius:14px;
     color:#eef0ff; font-size:.9rem; font-family:Inter,sans-serif;
     outline:none; transition:border-color .2s,box-shadow .2s;
-    backdrop-filter:blur(8px);
+    backdrop-filter:blur(16px);
   }
   .mp-search-inp::placeholder { color:#525878; }
   .mp-search-inp:focus { border-color:rgba(99,102,241,.55); box-shadow:0 0 0 3px rgba(99,102,241,.12); }
@@ -243,7 +243,7 @@ const CSS = `
   .mp-search-clr:hover { color:#8b90b8; }
 
   /* Category chips */
-  .mp-chip { padding:.4rem 1rem; border-radius:100px; flex-shrink:0; font-size:.79rem; font-weight:600; border:1px solid rgba(255,255,255,.09); background:rgba(13,17,32,.5); color:#8b90b8; cursor:pointer; white-space:nowrap; transition:all .2s ease; backdrop-filter:blur(4px); }
+  .mp-chip { padding:.4rem 1rem; border-radius:100px; flex-shrink:0; font-size:.79rem; font-weight:600; border:1px solid rgba(255,255,255,.1); background:rgba(13,17,32,.3); color:#8b90b8; cursor:pointer; white-space:nowrap; transition:all .2s ease; backdrop-filter:blur(8px); }
   .mp-chip:hover { border-color:rgba(255,255,255,.2); color:#eef0ff; }
   .mp-chip.on    { background:rgba(99,102,241,.18); border-color:rgba(99,102,241,.55); color:#818cf8; box-shadow:0 0 14px rgba(99,102,241,.2); }
 
