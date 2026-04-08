@@ -1,7 +1,8 @@
 'use client'
+import Link from 'next/link'
 import {
   Home, MessageSquare, Package, CreditCard,
-  AppWindow, ChevronLeft, ChevronRight, LogOut
+  AppWindow, ChevronLeft, ChevronRight, LogOut, ArrowLeft
 } from 'lucide-react'
 
 const NAV = [
@@ -252,6 +253,34 @@ const CSS = `
     transition: opacity .18s, width .26s cubic-bezier(0.16,1,0.3,1);
   }
   .csb--open .csb-logout-label { opacity: 1; width: auto; }
+
+  .csb-back {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0 12px;
+    height: 38px;
+    border-radius: 10px;
+    cursor: pointer;
+    color: var(--tx-3);
+    transition: all .18s;
+    text-decoration: none;
+    font-family: var(--font-body);
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    margin-bottom: 2px;
+  }
+  .csb--closed .csb-back { justify-content: center; padding: 0; }
+  .csb-back:hover { background: rgba(255,255,255,.06); color: var(--tx-2); }
+  .csb-back-label {
+    font-size: 12.5px;
+    font-weight: 500;
+    opacity: 0;
+    width: 0;
+    transition: opacity .18s, width .26s cubic-bezier(0.16,1,0.3,1);
+  }
+  .csb--open .csb-back-label { opacity: 1; width: auto; }
 `
 
 export default function ClientSidebar({ activeTab, onTabChange, open, onToggle, session, lead, onLogout, unread = 0 }) {
@@ -312,6 +341,10 @@ export default function ClientSidebar({ activeTab, onTabChange, open, onToggle, 
               <div className="csb-user-email">{userEmail}</div>
             </div>
           </div>
+          <Link href="/" className="csb-back">
+            <ArrowLeft size={15} strokeWidth={1.8} />
+            <span className="csb-back-label">Retour accueil</span>
+          </Link>
           <button className="csb-logout" onClick={onLogout}>
             <LogOut size={15} strokeWidth={1.8} />
             <span className="csb-logout-label">Déconnexion</span>

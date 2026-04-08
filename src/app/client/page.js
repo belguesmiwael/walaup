@@ -13,12 +13,16 @@ import { LogOut, ArrowLeft } from 'lucide-react'
 
 const CSS = `
   .cl-root {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     display: flex;
     flex-direction: column;
-    height: 100vh;
     overflow: hidden;
-    background: transparent;
-    position: relative;
+    background: var(--bg-base);
+    z-index: 1000;
   }
 
   /* ── Top bar mobile ── */
@@ -137,12 +141,15 @@ const CSS = `
   /* ── Loading ── */
   @keyframes cl-spin { to { transform: rotate(360deg); } }
   .cl-loading {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 100vh;
+    background: var(--bg-base);
     gap: 14px;
+    z-index: 1000;
   }
   .cl-spinner {
     width: 38px;
