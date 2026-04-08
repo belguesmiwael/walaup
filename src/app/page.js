@@ -314,6 +314,10 @@ export default function Home() {
     return () => clearInterval(t)
   }, [testimonials.length])
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [])
+
   const scrollToContact = () => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })
   const handleHeroSubmit = () => {
     if (!heroInput.trim()) return
