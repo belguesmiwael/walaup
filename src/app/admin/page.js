@@ -9,8 +9,6 @@ import TabMarketplace from '@/components/admin/tabs/TabMarketplace'
 import TabPaiements  from '@/components/admin/tabs/TabPaiements'
 import TabConfig     from '@/components/admin/tabs/TabConfig'
 
-// ── Temp password for demo (bypasses Supabase auth) ──────────────
-const DEMO_PASSWORD = 'walaup2025'
 
 const CSS = `
   @keyframes adm-fade-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
@@ -116,37 +114,25 @@ export default function AdminPage() {
   }, [])
 
   // Check existing session
-  useEffect(() => {
-    const check = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) {
-          const { data } = await supabase.from('users').select('role').eq('id', session.user.id).maybeSingle()
-          if (data?.role === 'super_admin') { setAuthed(true) }
-        }
-      } catch (e) {}
-      // Also check localStorage demo token
-      if (typeof window !== 'undefined') {
-        const demoAuthed = localStorage.getItem('walaup_admin_demo') === '1'
-        if (demoAuthed) setAuthed(true)
+useEffect(() => {
+  const check = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        const { data } = await supabase.from('users').select('role').eq('id', session.user.id).maybeSingle()
+        if (data?.role === 'super_admin') { setAuthed(true) }
       }
-      setLoading(false)
-    }
-    check()
-  }, [])
+    } catch (e) {}
+    setLoading(false)
+  }
+  check()
+}, [])
 
   const handleLogin = async (e) => {
     e?.preventDefault()
     setLoginErr('')
     setLoginLoading(true)
 
-    // Demo password bypass
-    if (loginForm.password === DEMO_PASSWORD) {
-      if (typeof window !== 'undefined') localStorage.setItem('walaup_admin_demo', '1')
-      setAuthed(true)
-      setLoginLoading(false)
-      return
-    }
 
     // Supabase auth
     try {
