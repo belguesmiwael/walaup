@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { WalaupSound } from '@/lib/sound'
 import ClientSidebar from '@/components/client/ClientSidebar'
@@ -8,20 +9,75 @@ import ClientBottomTabs from '@/components/client/ClientBottomTabs'
 import TabProjet from '@/components/client/tabs/TabProjet'
 import TabMessages from '@/components/client/tabs/TabMessages'
 import { TabAbonnement, TabPaiements, TabApps } from '@/components/client/tabs/index.js'
-
-// ─── Security notes ───────────────────────────────────────────────────────────
-// - Auth checked on every mount — unauthenticated users redirected to /login
-// - Lead fetched by email match only (ownership enforced)
-// - onAuthStateChange watches for session expiry mid-session
-// ─────────────────────────────────────────────────────────────────────────────
+import { LogOut, ArrowLeft } from 'lucide-react'
 
 const CSS = `
-  .cl-layout {
+  .cl-root {
     display: flex;
-    height: calc(100vh - 64px);
+    flex-direction: column;
+    height: 100vh;
     overflow: hidden;
     background: transparent;
     position: relative;
+  }
+
+  /* ── Top bar mobile ── */
+  .cl-topbar {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 52px;
+    flex-shrink: 0;
+    background: rgba(10,14,28,.92);
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    backdrop-filter: blur(20px);
+    position: relative;
+    z-index: 20;
+  }
+  .cl-topbar-logo {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #6366F1, #8B5CF6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-decoration: none;
+  }
+  .cl-topbar-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font-body);
+    cursor: pointer;
+    border: none;
+    transition: all .18s;
+    text-decoration: none;
+  }
+  .cl-topbar-btn--back {
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.09);
+    color: var(--tx-2);
+  }
+  .cl-topbar-btn--back:hover { background: rgba(255,255,255,.10); color: var(--tx); }
+  .cl-topbar-btn--logout {
+    background: rgba(248,113,113,.08);
+    border: 1px solid rgba(248,113,113,.16);
+    color: var(--red);
+  }
+  .cl-topbar-btn--logout:hover { background: rgba(248,113,113,.16); }
+
+  /* ── Body ── */
+  .cl-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
   .cl-main {
     flex: 1;
@@ -42,7 +98,7 @@ const CSS = `
   .cl-scroll::-webkit-scrollbar { width: 4px; }
   .cl-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 4px; }
 
-  /* Aurora */
+  /* ── Aurora ── */
   .cl-orb {
     position: fixed;
     border-radius: 50%;
@@ -68,23 +124,24 @@ const CSS = `
     filter: blur(55px);
   }
 
-  /* Mobile: push content above bottom tabs */
+  /* ── Responsive ── */
   @media (max-width: 767px) {
-    .cl-scroll { padding: 20px 16px 84px; }
+    .cl-topbar       { display: flex; }
     .cl-sidebar-wrap { display: none; }
+    .cl-scroll       { padding: 20px 16px 80px; }
   }
   @media (min-width: 768px) {
     .cl-bottomtabs-wrap { display: none; }
   }
 
-  /* Loading screen */
+  /* ── Loading ── */
   @keyframes cl-spin { to { transform: rotate(360deg); } }
   .cl-loading {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: calc(100vh - 64px);
+    height: 100vh;
     gap: 14px;
   }
   .cl-spinner {
@@ -118,9 +175,28 @@ export default function ClientPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [unread, setUnread] = useState(0)
 
+  // ── Fullscreen — hide navbar + footer directly via DOM ──────────────────
+  useEffect(() => {
+    // Query all possible nav/header/footer elements from the root layout
+    const toHide = [
+      ...document.querySelectorAll('nav'),
+      ...document.querySelectorAll('header'),
+      ...document.querySelectorAll('footer'),
+    ]
+    toHide.forEach(el => {
+      el.dataset.clHidden = el.style.display
+      el.style.setProperty('display', 'none', 'important')
+    })
+    return () => {
+      toHide.forEach(el => {
+        el.style.removeProperty('display')
+        delete el.dataset.clHidden
+      })
+    }
+  }, [])
+
   // ── Realtime unread count ────────────────────────────────────────────────
   const listenUnread = useCallback((leadId) => {
-    // Count unread admin messages for the badge
     const ch = supabase
       .channel(`cl-unread-${leadId}`)
       .on(
@@ -140,20 +216,16 @@ export default function ClientPage() {
     return ch
   }, [])
 
-  // ── Init: auth + lead ────────────────────────────────────────────────────
+  // ── Init ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     let unreadChannel = null
 
     async function init() {
       try {
         const { data: { session: s }, error } = await supabase.auth.getSession()
-        if (error || !s) {
-          router.push('/login')
-          return
-        }
+        if (error || !s) { router.push('/login'); return }
         setSession(s)
 
-        // Fetch most recent lead by email
         const { data: leads, error: leadErr } = await supabase
           .from('leads')
           .select('*')
@@ -164,7 +236,6 @@ export default function ClientPage() {
         if (!leadErr && leads && leads.length > 0) {
           const l = leads[0]
           setLead(l)
-          // Initial unread count
           const { count } = await supabase
             .from('messages')
             .select('id', { count: 'exact', head: true })
@@ -172,7 +243,6 @@ export default function ClientPage() {
             .eq('sender', 'admin')
             .eq('is_read', false)
           setUnread(count || 0)
-          // Start listening
           unreadChannel = listenUnread(l.id)
         }
       } catch (err) {
@@ -185,7 +255,6 @@ export default function ClientPage() {
 
     init()
 
-    // Watch for session changes (logout / expiry)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       if (event === 'SIGNED_OUT' || !s) router.push('/login')
     })
@@ -196,7 +265,7 @@ export default function ClientPage() {
     }
   }, [router, listenUnread])
 
-  // ── Clear unread badge when switching to messages tab ───────────────────
+  // ── Clear unread on messages tab ─────────────────────────────────────────
   useEffect(() => {
     if (activeTab === 'messages' && lead?.id && unread > 0) {
       supabase
@@ -233,32 +302,45 @@ export default function ClientPage() {
     <>
       <style>{CSS}</style>
 
-      {/* Aurora orbs */}
+      {/* Aurora */}
       <div className="cl-orb cl-orb--1" />
       <div className="cl-orb cl-orb--2" />
       <div className="cl-orb cl-orb--3" />
 
-      <div className="cl-layout">
-        {/* Desktop sidebar */}
-        <div className="cl-sidebar-wrap">
-          <ClientSidebar
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-            open={sidebarOpen}
-            onToggle={() => setSidebarOpen(v => !v)}
-            session={session}
-            lead={lead}
-            onLogout={handleLogout}
-            unread={unread}
-          />
+      <div className="cl-root">
+
+        {/* ── Mobile top bar : Accueil | Walaup | Quitter ── */}
+        <div className="cl-topbar">
+          <Link href="/" className="cl-topbar-btn cl-topbar-btn--back" onClick={() => WalaupSound.click()}>
+            <ArrowLeft size={13} /> Accueil
+          </Link>
+          <span className="cl-topbar-logo">Walaup</span>
+          <button className="cl-topbar-btn cl-topbar-btn--logout" onClick={handleLogout}>
+            <LogOut size={13} /> Quitter
+          </button>
         </div>
 
-        {/* Main content */}
-        <main className="cl-main">
-          <div className="cl-scroll">
-            {TABS[activeTab]}
+        <div className="cl-body">
+          {/* Desktop sidebar — contient déjà le bouton retour accueil + déconnexion */}
+          <div className="cl-sidebar-wrap">
+            <ClientSidebar
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              open={sidebarOpen}
+              onToggle={() => setSidebarOpen(v => !v)}
+              session={session}
+              lead={lead}
+              onLogout={handleLogout}
+              unread={unread}
+            />
           </div>
-        </main>
+
+          <main className="cl-main">
+            <div className="cl-scroll">
+              {TABS[activeTab]}
+            </div>
+          </main>
+        </div>
 
         {/* Mobile bottom tabs */}
         <div className="cl-bottomtabs-wrap">
@@ -268,6 +350,7 @@ export default function ClientPage() {
             unread={unread}
           />
         </div>
+
       </div>
     </>
   )
