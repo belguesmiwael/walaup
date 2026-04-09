@@ -96,46 +96,79 @@ const S = {
 // ─── Step Indicator — toujours visible ───────────────────────────────────────
 
 function StepIndicator({ current }) {
+  const total = STEP_LABELS.length          // 5
+  const progressPct = ((current - 1) / (total - 1)) * 80  // 0% → 80%
+
   return (
-    <div style={{ display:'flex', alignItems:'center', width:'100%' }}>
-      {STEP_LABELS.map((label, i) => {
-        const n    = i + 1
-        const done = n < current
-        const act  = n === current
-        return (
-          <div key={n} style={{ display:'flex', alignItems:'center', flex: i < STEP_LABELS.length - 1 ? 1 : 'none' }}>
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, flexShrink:0 }}>
+    <div style= position:'relative', width:'100%', paddingBottom:4 >
+
+      {/* ── Ligne de base (grise) ── */}
+      <div style=
+        position:'absolute',
+        top:15, left:'10%', width:'80%', height:2,
+        background:'rgba(255,255,255,0.07)',
+        borderRadius:1, zIndex:0,
+      />
+
+      {/* ── Ligne de progression (violette) ── */}
+      <div style={{
+        position:'absolute',
+        top:15, left:'10%',
+        width:`${progressPct}%`,
+        height:2,
+        background:'linear-gradient(90deg, var(--ac), var(--ac-2, var(--ac)))',
+        borderRadius:1, zIndex:0,
+        transition:'width 0.4s cubic-bezier(0.16,1,0.3,1)',
+        boxShadow:'0 0 8px rgba(99,102,241,0.45)',
+      }}/>
+
+      {/* ── Cercles équidistants ── */}
+      <div style= display:'flex', justifyContent:'space-between', alignItems:'flex-start' >
+        {STEP_LABELS.map((label, i) => {
+          const n    = i + 1
+          const done = n < current
+          const act  = n === current
+          return (
+            <div key={n} style=
+              flex:1,
+              display:'flex', flexDirection:'column', alignItems:'center',
+              gap:5, position:'relative', zIndex:1,
+            >
+              {/* Cercle */}
               <div style={{
                 width:30, height:30, borderRadius:'50%',
                 background: done ? 'var(--ac)' : act ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
                 border:`2px solid ${done ? 'var(--ac)' : act ? 'var(--ac)' : 'rgba(255,255,255,0.1)'}`,
                 display:'flex', alignItems:'center', justifyContent:'center',
                 transition:'all 0.3s cubic-bezier(0.16,1,0.3,1)',
-                boxShadow: act ? '0 0 16px rgba(99,102,241,0.45)' : done ? '0 0 10px rgba(99,102,241,0.25)' : 'none',
+                boxShadow: act  ? '0 0 16px rgba(99,102,241,0.50)'
+                         : done ? '0 0 10px rgba(99,102,241,0.25)'
+                         : 'none',
                 flexShrink:0,
               }}>
                 {done
                   ? <Check size={14} color="white" strokeWidth={2.5} />
-                  : <span style={{ fontSize:11, fontWeight:700, color: act ? 'var(--ac)' : 'var(--tx-3)', fontFamily:'var(--font-mono)' }}>{n}</span>
+                  : <span style=
+                      fontSize:11, fontWeight:700, fontFamily:'var(--font-mono)',
+                      color: act ? 'var(--ac)' : 'var(--tx-3)',
+                    >{n}</span>
                 }
               </div>
-              <span style={{
-                fontSize:9, fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
+
+              {/* Label */}
+              <span style=
+                fontSize:9, fontWeight:700,
+                letterSpacing:'0.05em', textTransform:'uppercase',
                 color: act ? 'var(--tx)' : done ? 'var(--tx-2)' : 'var(--tx-3)',
                 whiteSpace:'nowrap', transition:'color 0.3s ease',
-              }}>{label}</span>
+                textAlign:'center',
+              >
+                {label}
+              </span>
             </div>
-            {i < STEP_LABELS.length - 1 && (
-              <div style={{
-                flex:1, height:2, margin:'0 5px', marginBottom:16,
-                background: done ? 'var(--ac)' : 'rgba(255,255,255,0.07)',
-                borderRadius:1, transition:'background 0.4s ease',
-                boxShadow: done ? '0 0 6px rgba(99,102,241,0.35)' : 'none',
-              }} />
-            )}
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }
