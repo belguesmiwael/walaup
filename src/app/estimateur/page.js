@@ -630,6 +630,17 @@ export default function EstimateurPage() {
       }).catch(() => {})
   }, [])
 
+  // ── Masquer navbar / footer ──
+useEffect(() => {
+  const toHide = [
+    ...document.querySelectorAll('nav'),
+    ...document.querySelectorAll('header'),
+    ...document.querySelectorAll('footer'),
+  ]
+  toHide.forEach(el => el.style.setProperty('display', 'none', 'important'))
+  return () => toHide.forEach(el => el.style.removeProperty('display'))
+}, [])
+  
   const goTo = useCallback((n) => {
     if (animating) return
     setAnimating(true)
@@ -675,8 +686,21 @@ export default function EstimateurPage() {
   }
 
   return (
-    <>
-      <style>{`
+    <div className="est-root">
+      <style>{`.est-root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-base);
+  z-index: 1000;
+  overflow-y: auto;
+}
+.est-root::-webkit-scrollbar { width: 4px; }
+.est-root::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
+}
         @keyframes spin   { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
         .est-step { animation: fadeUp 0.24s cubic-bezier(0.16,1,0.3,1) both; }
@@ -827,6 +851,6 @@ export default function EstimateurPage() {
 
         </main>
       )}
-    </>
+    </div>
   )
 }
