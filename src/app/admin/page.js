@@ -1,4 +1,5 @@
 'use client'
+import { LayoutDashboard, Users, ShoppingBag, CreditCard, Settings } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -159,26 +160,34 @@ const CSS = `
 
   /* ── Responsive ── */
   @media(max-width:767px) {
-    .adm-sidebar-wrap { display:none !important; }
-    .adm-mobile-tabs {
-      display: flex;
-      border-top: 1px solid rgba(255,255,255,0.07);
-      background: rgba(8,11,20,0.97);
-      flex-shrink: 0;
-      z-index: 10;
-      padding-bottom: env(safe-area-inset-bottom, 0px);
-    }
-    .adm-mob-tab {
-      flex:1; display:flex; flex-direction:column;
-      align-items:center; gap:3px;
-      padding:9px 4px 7px;
-      font-size:9px; font-weight:600; color:var(--tx-3);
-      cursor:pointer; transition:color 150ms;
-      border:none; background:transparent;
-    }
-    .adm-mob-tab--active { color:var(--ac); }
-    .adm-mob-tab .adm-mob-emoji { font-size:18px; line-height:1; }
+  .adm-sidebar-wrap { display:none !important; }
+  .adm-mobile-tabs {
+    display: flex;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    background: rgba(8,11,20,0.97);
+    flex-shrink: 0;
+    z-index: 10;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+  .adm-mob-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 4px 8px;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--tx-3);
+    cursor: pointer;
+    transition: color 150ms;
+    border: none;
+    background: transparent;
+    font-family: 'Inter', sans-serif;
+  }
+  .adm-mob-tab--active { color: var(--ac); }
+  .adm-mob-tab svg { transition: stroke-width 150ms; }
+}
   @media(min-width:768px) {
     .adm-sidebar-wrap { display:flex !important; }
     .adm-mobile-tabs  { display:none !important; }
@@ -189,11 +198,11 @@ const CSS = `
    Mobile nav config
 ───────────────────────────────────────────────────────────────── */
 const MOB_NAV = [
-  { id: 'overview',    label: 'KPIs',    emoji: '📊' },
-  { id: 'clients',     label: 'Clients', emoji: '👥' },
-  { id: 'marketplace', label: 'Market',  emoji: '🏪' },
-  { id: 'paiements',   label: 'Paiem.',  emoji: '💳' },
-  { id: 'config',      label: 'Config',  emoji: '⚙️' },
+  { id: 'overview',    label: 'KPIs',    icon: LayoutDashboard },
+  { id: 'clients',     label: 'Clients', icon: Users           },
+  { id: 'marketplace', label: 'Market',  icon: ShoppingBag     },
+  { id: 'paiements',   label: 'Paiem.',  icon: CreditCard      },
+  { id: 'config',      label: 'Config',  icon: Settings        },
 ]
 
 /* ─────────────────────────────────────────────────────────────────
@@ -380,18 +389,22 @@ export default function AdminPage() {
             </div>
 
             {/* Bottom tabs — visible mobile uniquement via CSS */}
-            <div className="adm-mobile-tabs">
-              {MOB_NAV.map(n => (
-                <button
-                  key={n.id}
-                  className={`adm-mob-tab${tab === n.id ? ' adm-mob-tab--active' : ''}`}
-                  onClick={() => setTab(n.id)}
-                >
-                  <span className="adm-mob-emoji">{n.emoji}</span>
-                  <span>{n.label}</span>
-                </button>
-              ))}
-            </div>
+<div className="adm-mobile-tabs">
+  {MOB_NAV.map(n => {
+    const Icon = n.icon
+    const isActive = tab === n.id
+    return (
+      <button
+        key={n.id}
+        className={`adm-mob-tab${isActive ? ' adm-mob-tab--active' : ''}`}
+        onClick={() => setTab(n.id)}
+      >
+        <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
+        <span>{n.label}</span>
+      </button>
+    )
+  })}
+</div>
           </>
         )}
 
