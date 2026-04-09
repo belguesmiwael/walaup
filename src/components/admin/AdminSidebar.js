@@ -259,16 +259,17 @@ export default function AdminSidebar({ active, onTab, unreadCount = 0, pendingCo
         </div>
 
         {/* Footer */}
-        <div className="asb-foot">
-          <Link href="/" className="asb-back">
-            <ArrowLeft size={17} style= flexShrink: 0  />
-            <span className="asb-back-label">Retour accueil</span>
-          </Link>
-          <div className="asb-logout" onClick={onLogout}>
-            <LogOut size={17} style= flexShrink: 0  />
-            <span className="asb-logout-label">Déconnexion</span>
-          </div>
-        </div>
+        {/* Footer */}
+<div className="asb-foot">
+  <Link href="/" className="asb-back">
+    <ArrowLeft size={17} />
+    <span className="asb-back-label">Retour accueil</span>
+  </Link>
+  <div className="asb-logout" onClick={onLogout}>
+    <LogOut size={17} />
+    <span className="asb-logout-label">Déconnexion</span>
+  </div>
+</div>
 
       </div>
     </>
