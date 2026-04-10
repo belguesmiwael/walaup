@@ -300,9 +300,12 @@ export default function TabClients() {
     channelRef.current = supabase.channel(`msgs-${selected.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `lead_id=eq.${selected.id}` }, payload => {
         setMessages(prev => {
+          // Éviter les doublons avec le message temp admin
           if (prev.find(m => m.id === payload.new.id)) return prev
-          const next = [...prev, payload.new]
-          setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight }, 50)
+          // Remplacer le message temp si c'est un message admin qu'on vient d'envoyer
+          const withoutTemp = prev.filter(m => !(m._temp && m.sender === 'admin' && m.text === payload.new.text))
+          const next = [...withoutTemp, payload.new]
+          setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight }, 30)
           return next
         })
       })
@@ -313,9 +316,15 @@ export default function TabClients() {
   const sendMsg = async () => {
     if (!msg.trim() || !selected || sending) return
     setSending(true)
-    await supabase.from('messages').insert([{ lead_id: selected.id, sender: 'admin', text: msg.trim() }])
-    await supabase.from('leads').update({ last_message: msg.trim(), last_message_at: new Date().toISOString() }).eq('id', selected.id)
+    const text = msg.trim()
     setMsg('')
+    // Update optimiste immédiat — message visible sans attendre Realtime
+    const tempId = `temp-${Date.now()}`
+    const tempMsg = { id: tempId, lead_id: selected.id, sender: 'admin', text, created_at: new Date().toISOString(), _temp: true }
+    setMessages(prev => [...prev, tempMsg])
+    setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight }, 30)
+    await supabase.from('messages').insert([{ lead_id: selected.id, sender: 'admin', text }])
+    await supabase.from('leads').update({ last_message: text, last_message_at: new Date().toISOString() }).eq('id', selected.id)
     setSending(false)
   }
   const changeStatus = async (s) => {
