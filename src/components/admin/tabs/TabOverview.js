@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { TrendingUp, Users, CreditCard, Package, AlertTriangle, RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -16,8 +16,6 @@ export default function TabOverview() {
     try {
       const now = new Date()
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-
-      // KPIs
       const [leadsRes, revenueRes, clientsRes, appsRes, subsRes, cancelRes] = await Promise.all([
         supabase.from('leads').select('id', { count: 'exact' }).gte('created_at', monthStart),
         supabase.from('payments').select('amount').eq('status', 'completed').gte('created_at', monthStart),
@@ -26,81 +24,50 @@ export default function TabOverview() {
         supabase.from('leads').select('id', { count: 'exact' }).eq('status', 'delivered').not('pay_status', 'eq', 'none'),
         supabase.from('leads').select('id', { count: 'exact' }).eq('status', 'cancelled').gte('created_at', monthStart),
       ])
-
       const totalRevenue = (revenueRes.data || []).reduce((s, p) => s + (p.amount || 0), 0)
-
       setKpis([
-        { label: 'Leads ce mois', value: leadsRes.count || 0, unit: '', color: '#6366F1', icon: Users },
-        { label: 'Revenus (DT)', value: totalRevenue, unit: ' DT', color: '#F59E0B', icon: CreditCard },
-        { label: 'Clients actifs', value: clientsRes.count || 0, unit: '', color: '#10B981', icon: TrendingUp },
-        { label: 'Apps en cours', value: appsRes.count || 0, unit: '', color: '#22D3EE', icon: Package },
-        { label: 'Apps livrées', value: subsRes.count || 0, unit: '', color: '#8B5CF6', icon: TrendingUp },
-        { label: 'Résiliations', value: cancelRes.count || 0, unit: '', color: '#F87171', icon: AlertTriangle },
+        { label: 'Leads ce mois',    value: leadsRes.count  || 0, unit: '',    color: '#6366F1', icon: Users },
+        { label: 'Revenus (DT)',     value: totalRevenue,         unit: ' DT', color: '#F59E0B', icon: CreditCard },
+        { label: 'Clients actifs',   value: clientsRes.count || 0, unit: '',   color: '#10B981', icon: TrendingUp },
+        { label: 'Apps en cours',    value: appsRes.count   || 0, unit: '',    color: '#22D3EE', icon: Package },
+        { label: 'Apps livrées',     value: subsRes.count   || 0, unit: '',    color: '#8B5CF6', icon: TrendingUp },
+        { label: 'Résiliations',     value: cancelRes.count || 0, unit: '',    color: '#F87171', icon: AlertTriangle },
       ])
-
-      // Activité récente — dernières leads + messages
-      const actRes = await supabase
-        .from('messages')
-        .select('id, text, sender, created_at, leads(name, app)')
-        .order('created_at', { ascending: false })
-        .limit(10)
-
+      const actRes = await supabase.from('messages').select('id, text, sender, created_at, leads(name, app)').order('created_at', { ascending: false }).limit(10)
       if (actRes.data) {
         setActivity(actRes.data.map(m => ({
-          id: m.id,
-          time: formatRelTime(m.created_at),
-          text: m.sender === 'client'
-            ? `Message client — ${m.leads?.name || '?'} — "${m.text?.slice(0, 60)}…"`
-            : `Réponse admin — ${m.leads?.name || '?'}`,
+          id: m.id, time: formatRelTime(m.created_at),
+          text: m.sender === 'client' ? `Message client — ${m.leads?.name || '?'} — "${m.text?.slice(0,60)}…"` : `Réponse admin — ${m.leads?.name || '?'}`,
           color: m.sender === 'client' ? '#6366F1' : '#10B981',
         })))
       }
-
-      // Revenus 6 derniers mois
-      const revRes = await supabase
-        .from('payments')
-        .select('amount, created_at, type')
-        .eq('status', 'completed')
-        .gte('created_at', new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString())
-
+      const revRes = await supabase.from('payments').select('amount, created_at, type').eq('status', 'completed').gte('created_at', new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString())
       const months = Array.from({ length: 6 }, (_, i) => {
         const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)
         return { month: d.toLocaleString('fr-FR', { month: 'short' }), annual: 0, monthly: 0, key: `${d.getFullYear()}-${d.getMonth()}` }
       })
       ;(revRes.data || []).forEach(p => {
-        const d = new Date(p.created_at)
-        const key = `${d.getFullYear()}-${d.getMonth()}`
+        const d = new Date(p.created_at); const key = `${d.getFullYear()}-${d.getMonth()}`
         const m = months.find(m => m.key === key)
-        if (m) {
-          if (p.type === 'monthly') m.monthly += p.amount
-          else m.annual += p.amount
-        }
+        if (m) { if (p.type === 'monthly') m.monthly += p.amount; else m.annual += p.amount }
       })
       setRevenue(months)
-
-      // Répartition packs
       const packRes = await supabase.from('leads').select('pack').not('pack', 'is', null)
-      const counts = {}
-      ;(packRes.data || []).forEach(l => { counts[l.pack] = (counts[l.pack] || 0) + 1 })
+      const counts = {};(packRes.data || []).forEach(l => { counts[l.pack] = (counts[l.pack] || 0) + 1 })
       const total = Object.values(counts).reduce((s, v) => s + v, 0) || 1
       setPackDist([
-        { label: 'Pack Pro', count: counts['Pro'] || 0, color: '#6366F1', pct: Math.round(((counts['Pro'] || 0) / total) * 100) },
-        { label: 'Pack Essentiel', count: counts['Essentiel'] || 0, color: '#10B981', pct: Math.round(((counts['Essentiel'] || 0) / total) * 100) },
+        { label: 'Pack Pro',        count: counts['Pro']        || 0, color: '#6366F1', pct: Math.round(((counts['Pro']        || 0) / total) * 100) },
+        { label: 'Pack Essentiel',  count: counts['Essentiel']  || 0, color: '#10B981', pct: Math.round(((counts['Essentiel']  || 0) / total) * 100) },
         { label: 'Pack Partenaire', count: counts['Partenaire'] || 0, color: '#F59E0B', pct: Math.round(((counts['Partenaire'] || 0) / total) * 100) },
       ])
-
       setLastRefresh(new Date())
-    } catch (err) {
-      console.error('TabOverview fetchData', err)
-    }
+    } catch (err) { console.error('TabOverview', err) }
     setLoading(false)
   }
 
   useEffect(() => {
     fetchData()
-    // Refresh every 60s
     const interval = setInterval(fetchData, 60000)
-    // Realtime on leads + payments
     const ch = supabase.channel('admin-overview')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, fetchData)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, fetchData)
@@ -108,6 +75,14 @@ export default function TabOverview() {
       .subscribe()
     return () => { clearInterval(interval); supabase.removeChannel(ch) }
   }, [])
+
+  // ─ Style constants (safe from Notion corruption) ─
+  const sRefreshIcon = loading ? { animation: 'spin 1s linear infinite' } : {}
+  const sChartsWrap  = { flex: 2 }
+  const sPackLabel   = { fontSize: 11, color: 'var(--tx-2)', width: 110 }
+  const sEmptyAct    = { fontSize: 12, color: 'var(--tx-3)', padding: '12px 0' }
+  const sSkel1       = { height: 28, width: '60%', marginBottom: 8 }
+  const sSkel2       = { height: 12, width: '80%' }
 
   const CSS = `
     .adm-ov { padding:24px; overflow-y:auto; height:100%; }
@@ -162,33 +137,33 @@ export default function TabOverview() {
           Données en temps réel · Walaup Platform
           {lastRefresh && <span>· {lastRefresh.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>}
           <button className="adm-refresh-btn" onClick={fetchData}>
-            <RefreshCw size={11} style={loading ? { animation: 'spin 1s linear infinite' } : {}} />
-            Actualiser
+            <RefreshCw size={11} style={sRefreshIcon} /> Actualiser
           </button>
         </div>
 
-        {/* KPIs */}
         <div className="adm-kpi-grid">
           {(kpis || Array(6).fill(null)).map((k, i) => {
             const Icon = k?.icon || Users
+            const sIcon = { background: k ? `${k.color}18` : 'rgba(255,255,255,0.04)' }
+            const sVal  = { color: k ? k.color : 'var(--tx)' }
             return (
               <div key={i} className="adm-kpi-card">
                 <div className="adm-kpi-head">
-                  <div className="adm-kpi-icon" style={{ background: k ? `${k.color}18` : 'rgba(255,255,255,0.04)' }}>
+                  <div className="adm-kpi-icon" style={sIcon}>
                     {k && <Icon size={16} color={k.color} strokeWidth={1.8} />}
                   </div>
                 </div>
                 {k ? (
                   <>
-                    <div className="adm-kpi-val" style= color: k.color >
+                    <div className="adm-kpi-val" style={sVal}>
                       {k.unit === ' DT' ? k.value.toLocaleString('fr-TN') : k.value}{k.unit}
                     </div>
                     <div className="adm-kpi-label">{k.label}</div>
                   </>
                 ) : (
                   <>
-                    <div className="adm-skeleton" style= height: 28, width: '60%', marginBottom: 8  />
-                    <div className="adm-skeleton" style= height: 12, width: '80%'  />
+                    <div className="adm-skeleton" style={sSkel1} />
+                    <div className="adm-skeleton" style={sSkel2} />
                   </>
                 )}
               </div>
@@ -196,20 +171,21 @@ export default function TabOverview() {
           })}
         </div>
 
-        {/* Charts */}
         <div className="adm-charts">
-          <div className="adm-chart-card" style= flex: 2 >
+          <div className="adm-chart-card" style={sChartsWrap}>
             <div className="adm-chart-title">Revenus — 6 derniers mois (DT)</div>
             <div className="adm-bars">
               {revenue.map((r, i) => {
                 const total = r.annual + r.monthly
                 const hAnn = total ? Math.round((r.annual / max) * 110) : 0
                 const hMon = total ? Math.round((r.monthly / max) * 110) : 0
+                const sSegAnn = { height: hAnn, background: 'linear-gradient(180deg,#6366F1,#4f46e5)' }
+                const sSegMon = { height: hMon, background: 'linear-gradient(180deg,#F59E0B,#d97706)' }
                 return (
                   <div key={i} className="adm-bar-col">
                     <div className="adm-bar-stack">
-                      <div className="adm-bar-seg" style= height: hAnn, background: 'linear-gradient(180deg,#6366F1,#4f46e5)'  />
-                      <div className="adm-bar-seg" style= height: hMon, background: 'linear-gradient(180deg,#F59E0B,#d97706)'  />
+                      <div className="adm-bar-seg" style={sSegAnn} />
+                      <div className="adm-bar-seg" style={sSegMon} />
                     </div>
                     <div className="adm-bar-month">{r.month}</div>
                   </div>
@@ -219,32 +195,34 @@ export default function TabOverview() {
           </div>
           <div className="adm-chart-card">
             <div className="adm-chart-title">Répartition packs</div>
-            {packDist.map((p, i) => (
-              <div key={i} className="adm-pack-row">
-                <span style= fontSize: 11, color: 'var(--tx-2)', width: 110 >{p.label}</span>
-                <div className="adm-pack-bar">
-                  <div className="adm-pack-fill" style={{ width: `${p.pct}%`, background: p.color }} />
+            {packDist.map((p, i) => {
+              const sPackCount = { fontSize: 11, color: p.color, fontWeight: 700, width: 24, textAlign: 'right' }
+              const sPackFill  = { width: `${p.pct}%`, background: p.color }
+              return (
+                <div key={i} className="adm-pack-row">
+                  <span style={sPackLabel}>{p.label}</span>
+                  <div className="adm-pack-bar"><div className="adm-pack-fill" style={sPackFill} /></div>
+                  <span style={sPackCount}>{p.count}</span>
                 </div>
-                <span style= fontSize: 11, color: p.color, fontWeight: 700, width: 24, textAlign: 'right' >{p.count}</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 
-        {/* Activity */}
         <div className="adm-bottom">
           <div className="adm-activity">
             <div className="adm-activity-title">Activité récente</div>
-            {activity.length === 0 && !loading && (
-              <div style= fontSize: 12, color: 'var(--tx-3)', padding: '12px 0' >Aucune activité récente.</div>
-            )}
-            {activity.map((a, i) => (
-              <div key={a.id || i} className="adm-act-item">
-                <div className="adm-act-dot" style= background: a.color  />
-                <span className="adm-act-text">{a.text}</span>
-                <span className="adm-act-time">{a.time}</span>
-              </div>
-            ))}
+            {activity.length === 0 && !loading && <div style={sEmptyAct}>Aucune activité récente.</div>}
+            {activity.map((a, i) => {
+              const sDot = { background: a.color }
+              return (
+                <div key={a.id || i} className="adm-act-item">
+                  <div className="adm-act-dot" style={sDot} />
+                  <span className="adm-act-text">{a.text}</span>
+                  <span className="adm-act-time">{a.time}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
