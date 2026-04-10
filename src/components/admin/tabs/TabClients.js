@@ -255,6 +255,13 @@ function DemoPanel({ lead, onRefresh }) {
   )
 }
 
+// ── Push notifications helper ──────────────────────────────────────────────
+function pushNotif(title, body) {
+  if (typeof Notification === 'undefined') return
+  if (Notification.permission !== 'granted') return
+  try { new Notification(title, { body: body.slice(0, 100), icon: '/favicon.ico', tag: 'walaup-admin-msg', renotify: true }) } catch(e) {}
+}
+
 // ─── TabClients principal ───
 export default function TabClients() {
   const [leads, setLeads]       = useState([])
@@ -300,18 +307,27 @@ export default function TabClients() {
     channelRef.current = supabase.channel(`msgs-${selected.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `lead_id=eq.${selected.id}` }, payload => {
         setMessages(prev => {
-          // Éviter les doublons avec le message temp admin
           if (prev.find(m => m.id === payload.new.id)) return prev
-          // Remplacer le message temp si c'est un message admin qu'on vient d'envoyer
           const withoutTemp = prev.filter(m => !(m._temp && m.sender === 'admin' && m.text === payload.new.text))
           const next = [...withoutTemp, payload.new]
           setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight }, 30)
           return next
         })
+        // Notification push admin si message client reçu + page pas en focus
+        if (payload.new.sender === 'client' && document.hidden) {
+          pushNotif(`💬 ${selected?.name || 'Client'}`, payload.new.text)
+        }
       })
       .subscribe()
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
   }, [selected?.id, fetchMessages])
+
+  // Demander permission push au 1er rendu
+  useEffect(() => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
 
   const sendMsg = async () => {
     if (!msg.trim() || !selected || sending) return
