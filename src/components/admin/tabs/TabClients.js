@@ -1,11 +1,49 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
-  Search, Send, CheckCheck, X, CheckCircle2,
-  Monitor, Smartphone, CreditCard, Rocket, Eye, MessageSquare, Link2
+  Search, Send, CheckCheck, X, Eye, Smartphone, Monitor,
+  CheckCircle2, CreditCard, Rocket, ArrowLeft, User,
+  MessageSquare, Link2, AlertCircle, RefreshCw
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
+// ─── Demo meta helpers ────────────────────────────────────────────────────────
+function deepClone(obj) { return JSON.parse(JSON.stringify(obj)) }
+
+const DEMO_DEFAULT = {
+  demos: [
+    { slot: 1, url: '', status: 'pending' },
+    { slot: 2, url: '', status: 'locked' },
+    { slot: 3, url: '', status: 'locked' },
+  ],
+  finalUrl: '',
+  payStatus: 'none',
+  validatedSlot: null,
+}
+
+function parseDemoMeta(note) {
+  if (!note) return deepClone(DEMO_DEFAULT)
+  try {
+    if (note.startsWith('walaup_demos:')) {
+      return { ...deepClone(DEMO_DEFAULT), ...JSON.parse(note.slice(13)) }
+    }
+    if (note.startsWith('walaup_meta:')) {
+      const old = JSON.parse(note.slice(12))
+      const m = deepClone(DEMO_DEFAULT)
+      if (old.demoUrl) m.demos[0] = { slot: 1, url: old.demoUrl, status: 'sent' }
+      if (old.finalUrl) m.finalUrl = old.finalUrl
+      if (old.payStatus) m.payStatus = old.payStatus
+      return m
+    }
+  } catch {}
+  return deepClone(DEMO_DEFAULT)
+}
+
+function encodeDemoMeta(meta) {
+  return 'walaup_demos:' + JSON.stringify(meta)
+}
+
+// ─── Config ───────────────────────────────────────────────────────────────────
 const STATUS_CONFIG = {
   new:               { label: 'Nouveau',           color: '#22D3EE', bg: 'rgba(34,211,238,0.1)'  },
   demo:              { label: 'Démo prête',        color: '#6366F1', bg: 'rgba(99,102,241,0.1)'  },
@@ -25,203 +63,370 @@ const PAYMENT_METHODS = [
   { id: 'cheque',   label: 'Chèque',   emoji: '📄' },
 ]
 
-// ─── Static style constants ───────────────────────────────────────────────────
-const sEmptyState  = { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--tx-3)', fontSize: 13 }
-const sLoadingList = { padding: 16, fontSize: 12, color: 'var(--tx-3)' }
-const sStatusLabel = { fontSize: 10, color: 'var(--tx-3)', marginRight: 4 }
-const sPackBadge   = { padding: '2px 9px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: 'rgba(99,102,241,0.12)', color: 'var(--ac)' }
-const sNoMessages  = { textAlign: 'center', color: 'var(--tx-3)', fontSize: 12, padding: 20 }
-const sCheckMark   = { marginLeft: 4 }
-
-// ─── Helpers pour stocker l'URL démo/finale dans leads.note ──────────────────
-// leads.note peut contenir soit du texte brut, soit un JSON préfixé par "walaup_meta:"
-function parseMeta(note) {
-  if (!note) return { userNote: '', demoUrl: '', finalUrl: '', payStatus: 'none' }
-  try {
-    if (note.startsWith('walaup_meta:')) {
-      return { userNote: '', demoUrl: '', finalUrl: '', payStatus: 'none', ...JSON.parse(note.slice(12)) }
-    }
-  } catch {}
-  return { userNote: note, demoUrl: '', finalUrl: '', payStatus: 'none' }
+const DEMO_STATUS_UI = {
+  locked:           { label: '🔒 Verrouillée',           color: '#525878', bg: 'rgba(82,88,120,0.12)'  },
+  pending:          { label: '✏️ Prête à envoyer',       color: '#22D3EE', bg: 'rgba(34,211,238,0.1)'  },
+  sent:             { label: '📨 Envoyée au client',     color: '#6366F1', bg: 'rgba(99,102,241,0.1)'  },
+  modify_requested: { label: '↩️ Modification demandée', color: '#FB923C', bg: 'rgba(251,146,60,0.1)'  },
+  validated:        { label: '✅ Validée par client',    color: '#10B981', bg: 'rgba(16,185,129,0.12)' },
+  disabled:         { label: '🚫 Désactivée',            color: '#374151', bg: 'rgba(55,65,81,0.1)'   },
 }
 
-function encodeMeta(meta) {
-  return 'walaup_meta:' + JSON.stringify(meta)
-}
+const CSS = `
+  .tc-root { height:100%; overflow:hidden; display:flex; flex-direction:column; }
 
-// ─── DemoPanel — utilise uniquement les colonnes existantes de leads ──────────
-// Colonnes utilisées : note (pour demoUrl/finalUrl/payStatus), status, pay_method, pay_amount
-function DemoPanel({ lead, onRefresh }) {
-  const meta = parseMeta(lead.note)
-  const [demoUrl, setDemoUrl]   = useState(meta.demoUrl || '')
-  const [finalUrl, setFinalUrl] = useState(meta.finalUrl || '')
-  const [payMethod, setPayMethod] = useState(lead.pay_method || 'flouci')
-  const [payAmount, setPayAmount] = useState(lead.pay_amount ? String(lead.pay_amount) : '')
-  const [saving, setSaving]     = useState(false)
-  const [previewUrl, setPreviewUrl] = useState(null)
-  const [previewMode, setPreviewMode] = useState('browser')
+  /* LIST */
+  .tc-list { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  .tc-list-head { padding:14px 16px; border-bottom:1px solid rgba(255,255,255,0.07); display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .tc-list-title { font-family:'Space Grotesk',sans-serif; font-weight:800; font-size:18px; color:var(--tx); }
+  .tc-list-search { flex:1; position:relative; }
+  .tc-sinp { width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.09); border-radius:10px; padding:8px 10px 8px 34px; color:var(--tx); font-size:12px; outline:none; box-sizing:border-box; }
+  .tc-sinp:focus { border-color:rgba(99,102,241,0.4); }
+  .tc-sico { position:absolute; left:10px; top:50%; transform:translateY(-50%); pointer-events:none; }
+  .tc-list-scroll { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; }
+  .tc-list-scroll::-webkit-scrollbar { width:3px; }
+  .tc-list-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:2px; }
+  .tc-lead-card { padding:14px 16px; border-radius:12px; background:rgba(13,17,32,0.6); border:1px solid rgba(255,255,255,0.07); cursor:pointer; transition:all 180ms; display:flex; align-items:center; gap:12px; }
+  .tc-lead-card:hover { border-color:rgba(99,102,241,0.3); transform:translateX(3px); }
+  .tc-avatar { width:40px; height:40px; border-radius:50%; flex-shrink:0; background:linear-gradient(135deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; color:#fff; font-family:'Space Grotesk',sans-serif; }
+  .tc-avatar--sm { width:32px; height:32px; font-size:12px; }
+  .tc-lead-info { flex:1; min-width:0; }
+  .tc-lead-name { font-weight:700; font-size:13px; color:var(--tx); margin-bottom:2px; }
+  .tc-lead-meta { font-size:11px; color:var(--tx-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tc-lead-right { display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex-shrink:0; }
+  .tc-badge { padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; }
+  .tc-unread-dot { width:17px; height:17px; border-radius:9px; background:var(--red); font-size:9px; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .tc-empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:var(--tx-3); font-size:13px; padding:40px; }
 
-  const payStatus = meta.payStatus || 'none'
-  const isDelivered = lead.status === 'delivered'
+  /* DETAIL */
+  .tc-detail { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  .tc-detail-head { padding:12px 16px; border-bottom:1px solid rgba(255,255,255,0.07); display:flex; align-items:center; gap:10px; flex-shrink:0; background:rgba(10,14,28,0.7); backdrop-filter:blur(12px); }
+  .tc-back-btn { display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:9px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:var(--tx-2); font-size:12px; font-weight:600; cursor:pointer; transition:all 160ms; font-family:'Inter',sans-serif; flex-shrink:0; }
+  .tc-back-btn:hover { background:rgba(255,255,255,0.09); color:var(--tx); }
+  .tc-detail-name { font-weight:700; font-size:14px; color:var(--tx); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tc-tab-btns { display:flex; gap:5px; flex-shrink:0; }
+  .tc-tab-btn { padding:7px 14px; border-radius:9px; font-size:12px; font-weight:600; cursor:pointer; border:1px solid transparent; transition:all 160ms; background:transparent; color:var(--tx-3); font-family:'Inter',sans-serif; display:flex; align-items:center; gap:5px; }
+  .tc-tab-btn--active { background:rgba(99,102,241,0.15); border-color:rgba(99,102,241,0.35); color:var(--ac); }
 
-  const saveMeta = async (patch) => {
-    const current = parseMeta(lead.note)
-    const updated = { ...current, ...patch }
-    await supabase.from('leads').update({ note: encodeMeta(updated) }).eq('id', lead.id)
-  }
+  /* INFO TAB */
+  .tc-info { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .tc-info::-webkit-scrollbar { width:3px; }
+  .tc-info::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:2px; }
+  .tc-section { background:rgba(13,17,32,0.65); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:16px; }
+  .tc-section-title { font-size:10px; font-weight:700; color:var(--tx-3); letter-spacing:.08em; text-transform:uppercase; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+  .tc-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media(max-width:600px){ .tc-grid2 { grid-template-columns:1fr; } }
+  .tc-field label { display:block; font-size:10px; font-weight:600; color:var(--tx-3); text-transform:uppercase; letter-spacing:.05em; margin-bottom:3px; }
+  .tc-field span { font-size:13px; color:var(--tx); font-weight:500; }
+  .tc-status-bar { display:flex; gap:5px; flex-wrap:wrap; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); margin-top:12px; align-items:center; }
+  .tc-status-bar-label { font-size:10px; color:var(--tx-3); flex-shrink:0; }
+  .tc-status-btn { padding:4px 9px; border-radius:7px; font-size:10px; font-weight:600; cursor:pointer; border:1px solid rgba(255,255,255,0.1); background:transparent; color:var(--tx-2); transition:all 150ms; font-family:'Inter',sans-serif; }
+  .tc-status-btn:hover { background:rgba(99,102,241,0.1); color:var(--tx); }
+  .tc-status-btn--active { background:rgba(99,102,241,0.15); border-color:rgba(99,102,241,0.4); color:var(--ac); }
 
-  // 1. Envoyer la démo au client
-  const sendDemo = async () => {
-    if (!demoUrl.trim()) return alert('Entre l\'URL de la démo avant d\'envoyer.')
-    setSaving(true)
-    await saveMeta({ demoUrl: demoUrl.trim() })
-    await supabase.from('leads').update({ status: 'demo' }).eq('id', lead.id)
-    await supabase.from('messages').insert({
-      lead_id: lead.id,
-      sender: 'admin',
-      text: `🎯 Votre démo est prête ! Consultez-la ici : ${demoUrl.trim()} — Dites-nous si vous souhaitez des modifications.`,
-    })
-    await onRefresh()
-    setSaving(false)
-  }
+  /* DEMO PANEL */
+  .tc-demo-slot { border:1px solid rgba(255,255,255,0.07); border-radius:11px; padding:12px; margin-bottom:9px; background:rgba(8,11,20,0.5); transition:border-color 200ms; }
+  .tc-demo-slot--validated { border-color:rgba(16,185,129,0.3); }
+  .tc-demo-slot--dim { opacity:0.38; pointer-events:none; }
+  .tc-demo-head { display:flex; align-items:center; gap:8px; margin-bottom:9px; }
+  .tc-demo-num { font-size:12px; font-weight:800; color:var(--tx); font-family:'Space Grotesk',sans-serif; }
+  .tc-demo-badge { padding:2px 8px; border-radius:20px; font-size:10px; font-weight:600; }
+  .tc-demo-url-row { display:flex; gap:5px; margin-bottom:7px; }
+  .tc-demo-inp { flex:1; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.09); border-radius:7px; padding:6px 9px; color:var(--tx); font-size:11px; outline:none; font-family:'JetBrains Mono',monospace; }
+  .tc-demo-inp:focus { border-color:rgba(99,102,241,0.4); }
+  .tc-demo-actions { display:flex; gap:5px; flex-wrap:wrap; }
+  .tc-demo-btn { display:flex; align-items:center; gap:5px; padding:5px 11px; border-radius:7px; border:none; font-size:11px; font-weight:700; cursor:pointer; transition:all 150ms; font-family:'Inter',sans-serif; }
+  .tc-demo-btn:disabled { opacity:0.45; cursor:not-allowed; }
+  .tc-demo-btn--send { background:linear-gradient(135deg,#6366F1,#8B5CF6); color:#fff; }
+  .tc-demo-btn--preview { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:var(--tx-2); }
+  .tc-demo-btn--disable { background:rgba(248,113,113,0.09); border:1px solid rgba(248,113,113,0.18); color:#F87171; }
 
-  // 2. Demander le paiement
-  const requestPayment = async () => {
-    if (!payAmount || isNaN(parseFloat(payAmount))) return alert('Entre le montant avant de demander le paiement.')
-    setSaving(true)
-    const pm = PAYMENT_METHODS.find(p => p.id === payMethod)
-    await saveMeta({ payStatus: 'requested' })
-    await supabase.from('leads').update({
-      status: 'payment_requested',
-      pay_method: payMethod,
-      pay_amount: parseFloat(payAmount),
-    }).eq('id', lead.id)
-    await supabase.from('messages').insert({
-      lead_id: lead.id,
-      sender: 'admin',
-      text: `💳 Paiement requis pour continuer : ${payAmount} DT via ${pm?.label || payMethod}. Contactez-nous pour procéder.`,
-    })
-    await onRefresh()
-    setSaving(false)
-  }
+  .tc-pay-box { border:1px solid rgba(245,158,11,0.2); border-radius:11px; padding:13px; background:rgba(245,158,11,0.04); margin-top:9px; }
+  .tc-pay-title { font-size:11px; font-weight:700; color:var(--gold); margin-bottom:9px; display:flex; align-items:center; gap:6px; }
+  .tc-pay-methods { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:8px; }
+  .tc-pay-method { padding:4px 9px; border-radius:7px; font-size:10px; font-weight:600; cursor:pointer; border:1px solid; transition:all 150ms; font-family:'Inter',sans-serif; }
+  .tc-pay-inp { width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 11px; color:var(--tx); font-size:13px; outline:none; box-sizing:border-box; margin-bottom:8px; font-family:'JetBrains Mono',monospace; }
+  .tc-pay-btn { display:flex; align-items:center; gap:6px; padding:8px 15px; border-radius:9px; border:none; font-size:12px; font-weight:700; cursor:pointer; font-family:'Inter',sans-serif; }
+  .tc-pay-btn--gold { background:linear-gradient(135deg,#F59E0B,#D97706); color:#000; }
+  .tc-pay-btn--green { background:linear-gradient(135deg,#10B981,#059669); color:#fff; }
+  .tc-pay-btn:disabled { opacity:.5; cursor:not-allowed; }
 
-  // 3. Confirmer le paiement reçu
-  const confirmPayment = async () => {
-    setSaving(true)
-    await saveMeta({ payStatus: 'confirmed' })
-    await supabase.from('leads').update({ status: 'payment_confirmed' }).eq('id', lead.id)
-    await supabase.from('messages').insert({
-      lead_id: lead.id,
-      sender: 'admin',
-      text: '✅ Paiement confirmé ! Votre application est en cours de développement final.',
-    })
-    await onRefresh()
-    setSaving(false)
-  }
+  .tc-final-box { border:1px solid rgba(16,185,129,0.25); border-radius:11px; padding:13px; background:rgba(16,185,129,0.04); margin-top:9px; }
+  .tc-final-title { font-size:11px; font-weight:700; color:#10B981; margin-bottom:9px; display:flex; align-items:center; gap:6px; }
+  .tc-final-row { display:flex; gap:7px; }
+  .tc-final-inp { flex:1; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:7px 10px; color:var(--tx); font-size:11px; outline:none; font-family:'JetBrains Mono',monospace; }
+  .tc-deliver-btn { display:flex; align-items:center; gap:5px; padding:7px 14px; border-radius:9px; border:none; background:linear-gradient(135deg,#10B981,#059669); color:#fff; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; font-family:'Inter',sans-serif; }
+  .tc-deliver-btn:disabled { opacity:.5; cursor:not-allowed; }
 
-  // 4. Livrer l'app finale
-  const deliverApp = async () => {
-    if (!finalUrl.trim()) return alert('Entre l\'URL de la version finale avant de livrer.')
-    setSaving(true)
-    await saveMeta({ finalUrl: finalUrl.trim(), payStatus: 'confirmed' })
-    await supabase.from('leads').update({
-      status: 'delivered',
-      pay_ref: finalUrl.trim(),
-    }).eq('id', lead.id)
-    await supabase.from('messages').insert({
-      lead_id: lead.id,
-      sender: 'admin',
-      text: `🎉 Félicitations ! Votre application est prête et déployée : ${finalUrl.trim()}`,
-    })
-    await onRefresh()
-    setSaving(false)
-  }
+  /* CHAT */
+  .tc-chat { flex:1; overflow-y:auto; padding:14px 16px; display:flex; flex-direction:column; gap:7px; }
+  .tc-chat::-webkit-scrollbar { width:3px; }
+  .tc-chat::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:2px; }
+  .tc-bubble { max-width:72%; padding:8px 12px; border-radius:14px; font-size:13px; line-height:1.5; word-break:break-word; }
+  .tc-bubble--admin { align-self:flex-end; background:linear-gradient(135deg,#6366F1,#8B5CF6); color:#fff; border-bottom-right-radius:4px; }
+  .tc-bubble--client { align-self:flex-start; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); color:var(--tx); border-bottom-left-radius:4px; }
+  .tc-bubble-ts { font-size:10px; opacity:.6; margin-top:3px; text-align:right; }
+  .tc-no-msgs { text-align:center; color:var(--tx-3); font-size:12px; padding:28px; }
+  .tc-chat-inp { padding:10px 14px; border-top:1px solid rgba(255,255,255,0.07); display:flex; gap:8px; align-items:flex-end; flex-shrink:0; }
+  .tc-chat-field { flex:1; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.09); border-radius:10px; padding:8px 12px; color:var(--tx); font-size:13px; outline:none; resize:none; font-family:'Inter',sans-serif; max-height:100px; }
+  .tc-chat-field:focus { border-color:rgba(99,102,241,0.4); }
+  .tc-chat-send { width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#6366F1,#8B5CF6); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#fff; transition:transform 150ms; flex-shrink:0; }
+  .tc-chat-send:hover { transform:scale(1.08); }
+  .tc-chat-send:disabled { opacity:.5; cursor:not-allowed; transform:none; }
 
-  const sSection  = { marginBottom: 14, padding: 14, borderRadius: 12, background: 'rgba(13,17,32,0.7)', border: '1px solid rgba(255,255,255,0.08)' }
-  const sTitle    = { fontSize: 12, fontWeight: 700, color: 'var(--tx)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 7 }
-  const sInp      = { width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 9, padding: '8px 11px', color: 'var(--tx)', fontSize: 12, outline: 'none', fontFamily: "'JetBrains Mono',monospace", boxSizing: 'border-box', marginBottom: 8 }
-  const sBtn      = (color='#6366F1') => ({ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 9, border: 'none', background: `linear-gradient(135deg,${color},${color}dd)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: saving ? 0.6 : 1 })
-  const sBtnGhost = { display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'var(--tx-2)', fontSize: 11, cursor: 'pointer', marginLeft: 8 }
-  const sRow      = { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }
-  const sMethodGrid = { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }
+  /* PREVIEW */
+  .tc-prev-ov { position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; }
+  .tc-prev-head { padding:10px 14px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; gap:8px; align-items:center; background:rgba(13,17,32,0.9); }
+  .tc-prev-url { flex:1; font-size:11px; color:var(--tx-3); font-family:'JetBrains Mono',monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tc-toggle-wrap { display:flex; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.09); border-radius:8px; padding:2px; gap:2px; }
+  .tc-toggle-btn { padding:4px 10px; border-radius:6px; border:none; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; background:transparent; color:var(--tx-3); font-family:'Inter',sans-serif; }
+  .tc-toggle-btn--on { background:rgba(99,102,241,0.2); color:var(--ac); }
+  .tc-close-btn { width:28px; height:28px; border-radius:7px; border:none; background:rgba(248,113,113,0.12); color:#F87171; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .tc-phone-shell { background:rgba(13,17,32,0.95); border:2px solid rgba(255,255,255,0.15); border-radius:36px; padding:14px; box-shadow:0 40px 100px rgba(0,0,0,0.8); }
+  .tc-phone-notch { width:60px; height:5px; background:rgba(255,255,255,0.1); border-radius:3px; margin:0 auto 10px; }
+  .tc-phone-screen { width:260px; height:520px; border-radius:24px; overflow:hidden; background:#000; }
+  .tc-browser-bar { background:rgba(17,24,39,0.9); border-bottom:1px solid rgba(255,255,255,0.06); padding:8px 14px; display:flex; align-items:center; gap:10px; }
+  .tc-browser-dots { display:flex; gap:5px; }
+  .tc-browser-dot { width:9px; height:9px; border-radius:50%; }
+  .tc-browser-url { flex:1; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08); border-radius:5px; padding:3px 10px; font-size:11px; color:var(--tx-3); font-family:'JetBrains Mono',monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+`
 
-  const previewOverlay = previewUrl && (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-      onClick={() => setPreviewUrl(null)}>
-      <div style={{ background: '#0D1120', borderRadius: 16, overflow: 'hidden', width: previewMode === 'phone' ? 390 : '90%', maxWidth: 1000, height: '85vh', display: 'flex', flexDirection: 'column' }}
+// ─── Preview modal ────────────────────────────────────────────────────────────
+function PreviewModal({ url, onClose }) {
+  const [mode, setMode] = useState('browser')
+  const screenRef = useRef(null)
+  const iframeRef = useRef(null)
+
+  const scaleMobile = useCallback(() => {
+    if (!screenRef.current || !iframeRef.current) return
+    const mw = 390
+    const scale = screenRef.current.clientWidth / mw
+    iframeRef.current.style.width = mw + 'px'
+    iframeRef.current.style.height = Math.ceil(screenRef.current.clientHeight / scale) + 'px'
+    iframeRef.current.style.transform = `scale(${scale})`
+    iframeRef.current.style.transformOrigin = 'top left'
+  }, [])
+
+  useEffect(() => { if (mode === 'mobile') setTimeout(scaleMobile, 120) }, [mode, scaleMobile])
+
+  return (
+    <div className="tc-prev-ov" onClick={onClose}>
+      <div style={{ background: '#0D1120', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 40px 100px rgba(0,0,0,0.8)', width: mode === 'mobile' ? 'auto' : 'min(900px,92vw)', display: 'flex', flexDirection: 'column' }}
         onClick={e => e.stopPropagation()}>
-        <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ flex: 1, fontSize: 12, color: 'var(--tx-2)' }}>{previewUrl}</span>
-          <button style={{ ...sBtnGhost, marginLeft: 0 }} onClick={() => setPreviewMode('browser')}><Monitor size={11} /></button>
-          <button style={{ ...sBtnGhost, marginLeft: 0 }} onClick={() => setPreviewMode('phone')}><Smartphone size={11} /></button>
-          <button style={{ ...sBtnGhost, marginLeft: 0, color: '#F87171' }} onClick={() => setPreviewUrl(null)}><X size={11} /></button>
+        <div className="tc-prev-head">
+          <span className="tc-prev-url">{url}</span>
+          <div className="tc-toggle-wrap">
+            <button className={`tc-toggle-btn${mode === 'mobile' ? ' tc-toggle-btn--on' : ''}`} onClick={() => setMode('mobile')}><Smartphone size={11} /> Mobile</button>
+            <button className={`tc-toggle-btn${mode === 'browser' ? ' tc-toggle-btn--on' : ''}`} onClick={() => setMode('browser')}><Monitor size={11} /> Desktop</button>
+          </div>
+          <button className="tc-close-btn" onClick={onClose}><X size={13} /></button>
         </div>
-        <iframe src={previewUrl} sandbox="allow-scripts allow-forms allow-popups" title="Aperçu" style={{ flex: 1, border: 'none', width: '100%' }} />
+        {mode === 'mobile' ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}>
+            <div className="tc-phone-shell">
+              <div className="tc-phone-notch" />
+              <div className="tc-phone-screen" ref={screenRef}>
+                <iframe ref={iframeRef} src={url} sandbox="allow-scripts allow-forms allow-popups" title="preview" style={{ border: 'none', display: 'block' }} onLoad={scaleMobile} />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="tc-browser-bar">
+              <div className="tc-browser-dots">
+                <div className="tc-browser-dot" style={{ background: '#F87171' }} />
+                <div className="tc-browser-dot" style={{ background: '#FBBF24' }} />
+                <div className="tc-browser-dot" style={{ background: '#34D399' }} />
+              </div>
+              <div className="tc-browser-url">{url}</div>
+            </div>
+            <div style={{ height: 480 }}>
+              <iframe src={url} sandbox="allow-scripts allow-forms allow-popups" title="preview desktop" style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
+}
+
+// ─── DemoPanel ────────────────────────────────────────────────────────────────
+function DemoPanel({ lead, onRefresh }) {
+  const [meta, setMetaState] = useState(() => parseDemoMeta(lead.note))
+  const [demoUrls, setDemoUrls] = useState(() => {
+    const u = {}; parseDemoMeta(lead.note).demos.forEach(d => { u[d.slot] = d.url || '' }); return u
+  })
+  const [finalUrl, setFinalUrl] = useState(() => parseDemoMeta(lead.note).finalUrl || '')
+  const [payMethod, setPayMethod] = useState(lead.pay_method || 'flouci')
+  const [payAmount, setPayAmount] = useState(lead.pay_amount ? String(lead.pay_amount) : '')
+  const [saving, setSaving] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState(null)
+
+  useEffect(() => {
+    const m = parseDemoMeta(lead.note)
+    setMetaState(m)
+    const u = {}; m.demos.forEach(d => { u[d.slot] = d.url || '' })
+    setDemoUrls(u)
+    setFinalUrl(m.finalUrl || '')
+  }, [lead.note, lead.status, lead.pay_method, lead.pay_amount])
+
+  const persist = async (newMeta) => {
+    await supabase.from('leads').update({ note: encodeDemoMeta(newMeta) }).eq('id', lead.id)
+    setMetaState(newMeta)
+  }
+
+  const sendDemo = async (slot) => {
+    const url = (demoUrls[slot] || '').trim()
+    if (!url) return alert('Entre l\'URL avant d\'envoyer.')
+    setSaving(true)
+    const m = deepClone(meta)
+    const idx = m.demos.findIndex(d => d.slot === slot)
+    m.demos[idx].url = url
+    m.demos[idx].status = 'sent'
+    await persist(m)
+    await supabase.from('leads').update({ status: 'demo' }).eq('id', lead.id)
+    await supabase.from('messages').insert({
+      lead_id: lead.id, sender: 'admin',
+      text: `🎯 Votre démo ${slot} est disponible ! Connectez-vous à votre espace pour la visualiser et nous donner votre retour.`
+    })
+    await onRefresh(); setSaving(false)
+  }
+
+  const disableDemo = async (slot) => {
+    if (!confirm(`Désactiver la démo ${slot} ?`)) return
+    setSaving(true)
+    const m = deepClone(meta)
+    const idx = m.demos.findIndex(d => d.slot === slot)
+    m.demos[idx].status = 'disabled'
+    await persist(m)
+    await onRefresh(); setSaving(false)
+  }
+
+  const confirmPayment = async () => {
+    if (!payAmount) return alert('Entre le montant du paiement.')
+    setSaving(true)
+    const m = deepClone(meta)
+    m.payStatus = 'confirmed'
+    await persist(m)
+    await supabase.from('leads').update({
+      status: 'payment_confirmed',
+      pay_method: payMethod,
+      pay_amount: parseFloat(payAmount) || 0,
+    }).eq('id', lead.id)
+    await supabase.from('messages').insert({
+      lead_id: lead.id, sender: 'admin',
+      text: '✅ Paiement confirmé ! Votre application est en cours de développement final. Merci pour votre confiance.'
+    })
+    await onRefresh(); setSaving(false)
+  }
+
+  const deliverFinal = async () => {
+    const url = finalUrl.trim()
+    if (!url) return alert('Entre l\'URL de la version finale.')
+    setSaving(true)
+    const m = deepClone(meta)
+    m.demos = m.demos.map(d => ({ ...d, status: 'disabled' }))
+    m.finalUrl = url
+    await persist(m)
+    await supabase.from('leads').update({ status: 'delivered', pay_ref: url }).eq('id', lead.id)
+    await supabase.from('messages').insert({
+      lead_id: lead.id, sender: 'admin',
+      text: `🎉 Félicitations ! Votre application est prête et déployée : ${url}`
+    })
+    await onRefresh(); setSaving(false)
+  }
+
+  const payStatus = meta.payStatus || 'none'
+  const isDelivered = lead.status === 'delivered'
+  const validatedDemo = meta.demos.find(d => d.status === 'validated')
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {previewOverlay}
-
-      {/* Section 1 — Démo */}
-      <div style={sSection}>
-        <div style={sTitle}><Rocket size={14} color="var(--ac)" /> Envoyer la démo</div>
-        <input style={sInp} placeholder="https://demo.walaup.tn/..." value={demoUrl}
-          onChange={e => setDemoUrl(e.target.value)} />
-        <div style={sRow}>
-          <button style={sBtn()} onClick={sendDemo} disabled={saving || !demoUrl.trim()}>
-            <Send size={11} /> {lead.status === 'demo' ? 'Renvoyer la démo' : 'Envoyer au client'}
-          </button>
-          {demoUrl && (
-            <button style={sBtnGhost} onClick={() => setPreviewUrl(demoUrl)}>
-              <Eye size={11} /> Aperçu
-            </button>
-          )}
-        </div>
-        {lead.status === 'demo' && (
-          <div style={{ marginTop: 8, fontSize: 11, color: '#22D3EE', display: 'flex', alignItems: 'center', gap: 5 }}>
-            <CheckCircle2 size={11} /> Démo envoyée au client
-          </div>
-        )}
+    <div>
+      {previewUrl && <PreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />}
+      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--tx-3)', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Rocket size={11} color="var(--ac)" /> Démos (3 max) + Livraison finale
       </div>
 
-      {/* Section 2 — Paiement */}
-      {['demo', 'payment_requested', 'payment_confirmed', 'delivered'].includes(lead.status) && (
-        <div style={sSection}>
-          <div style={sTitle}><CreditCard size={14} color="#F59E0B" /> Paiement</div>
+      {/* Slots démo */}
+      {meta.demos.map(demo => {
+        const sui = DEMO_STATUS_UI[demo.status] || DEMO_STATUS_UI.locked
+        const isLocked   = demo.status === 'locked'
+        const isPending  = demo.status === 'pending'
+        const isSent     = demo.status === 'sent'
+        const isModReq   = demo.status === 'modify_requested'
+        const isValidated= demo.status === 'validated'
+        const isDisabled = demo.status === 'disabled'
+        const canEdit    = isPending || isModReq
+        const canPreview = (isSent || isValidated || isModReq) && demo.url
+        const canDisable = (isSent || isModReq || isValidated) && !isDisabled
 
-          {payStatus === 'none' || payStatus === '' ? (
+        return (
+          <div key={demo.slot}
+            className={`tc-demo-slot${isValidated ? ' tc-demo-slot--validated' : ''}${(isLocked || isDisabled) ? ' tc-demo-slot--dim' : ''}`}>
+            <div className="tc-demo-head">
+              <span className="tc-demo-num">Démo {demo.slot}</span>
+              <span className="tc-demo-badge" style={{ background: sui.bg, color: sui.color }}>{sui.label}</span>
+            </div>
+
+            {(canEdit || canPreview) && (
+              <div className="tc-demo-url-row">
+                <input className="tc-demo-inp"
+                  placeholder="https://demo.walaup.tn/..."
+                  value={demoUrls[demo.slot] || ''}
+                  readOnly={isValidated || isDisabled}
+                  onChange={e => setDemoUrls(p => ({ ...p, [demo.slot]: e.target.value }))}
+                />
+              </div>
+            )}
+
+            {(isLocked || isDisabled) && demo.url && (
+              <div style={{ fontSize: 11, color: 'var(--tx-3)', fontFamily: "'JetBrains Mono',monospace", marginBottom: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{demo.url}</div>
+            )}
+
+            <div className="tc-demo-actions">
+              {canEdit && (
+                <button className="tc-demo-btn tc-demo-btn--send" onClick={() => sendDemo(demo.slot)} disabled={saving}>
+                  <Send size={11} /> Envoyer au client
+                </button>
+              )}
+              {canPreview && (
+                <button className="tc-demo-btn tc-demo-btn--preview" onClick={() => setPreviewUrl(demo.url)}>
+                  <Eye size={11} /> Aperçu
+                </button>
+              )}
+              {canDisable && (
+                <button className="tc-demo-btn tc-demo-btn--disable" onClick={() => disableDemo(demo.slot)} disabled={saving}>
+                  <X size={11} /> Désactiver
+                </button>
+              )}
+            </div>
+          </div>
+        )
+      })}
+
+      {/* Section paiement — démo validée */}
+      {validatedDemo && !isDelivered && (
+        <div className="tc-pay-box">
+          <div className="tc-pay-title"><CreditCard size={12} /> Paiement requis</div>
+          {(payStatus === 'none' || payStatus === 'requested') ? (
             <>
-              <div style={sMethodGrid}>
+              {payStatus === 'requested' && (
+                <div style={{ fontSize: 11, color: '#FB923C', marginBottom: 8 }}>⏳ En attente de paiement du client…</div>
+              )}
+              <div className="tc-pay-methods">
                 {PAYMENT_METHODS.map(pm => {
-                  const active = payMethod === pm.id
+                  const on = payMethod === pm.id
                   return (
-                    <button key={pm.id}
-                      style={{ padding: '4px 10px', borderRadius: 7, border: `1px solid ${active ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.1)'}`, background: active ? 'rgba(245,158,11,0.1)' : 'transparent', color: active ? 'var(--gold)' : 'var(--tx-2)', fontSize: 11, cursor: 'pointer' }}
-                      onClick={() => setPayMethod(pm.id)}>
-                      {pm.emoji} {pm.label}
-                    </button>
+                    <button key={pm.id} className="tc-pay-method"
+                      style={{ borderColor: on ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.1)', background: on ? 'rgba(245,158,11,0.1)' : 'transparent', color: on ? 'var(--gold)' : 'var(--tx-2)' }}
+                      onClick={() => setPayMethod(pm.id)}>{pm.emoji} {pm.label}</button>
                   )
                 })}
               </div>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                <input style={{ ...sInp, marginBottom: 0, flex: 1, fontFamily: "'Inter',sans-serif" }}
-                  type="number" placeholder="Montant (DT)" value={payAmount}
-                  onChange={e => setPayAmount(e.target.value)} />
-              </div>
-              <button style={sBtn('#F59E0B')} onClick={requestPayment} disabled={saving || !payAmount}>
-                Demander le paiement
-              </button>
-            </>
-          ) : payStatus === 'requested' ? (
-            <>
-              <div style={{ fontSize: 12, color: 'var(--tx-3)', marginBottom: 8 }}>
-                ⏳ Paiement demandé — {lead.pay_amount} DT via {PAYMENT_METHODS.find(p => p.id === lead.pay_method)?.label || lead.pay_method}
-              </div>
-              <button style={sBtn('#10B981')} onClick={confirmPayment} disabled={saving}>
-                <CheckCircle2 size={12} /> Confirmer réception paiement
+              <input className="tc-pay-inp" type="number" placeholder="Montant (DT)" value={payAmount}
+                onChange={e => setPayAmount(e.target.value)} />
+              <button className="tc-pay-btn tc-pay-btn--green" onClick={confirmPayment} disabled={saving || !payAmount}>
+                <CheckCircle2 size={12} /> Confirmer réception du paiement
               </button>
             </>
           ) : (
@@ -232,132 +437,131 @@ function DemoPanel({ lead, onRefresh }) {
         </div>
       )}
 
-      {/* Section 3 — Livraison finale */}
-      {(payStatus === 'confirmed' || lead.status === 'payment_confirmed') && !isDelivered && (
-        <div style={sSection}>
-          <div style={sTitle}><Rocket size={14} color="#10B981" /> Livrer la version finale</div>
-          <input style={sInp} placeholder="https://app.monbusiness.tn/..." value={finalUrl}
-            onChange={e => setFinalUrl(e.target.value)} />
-          <button style={sBtn('#10B981')} onClick={deliverApp} disabled={saving || !finalUrl.trim()}>
-            <Rocket size={11} /> Livrer l'application
-          </button>
+      {/* Livraison finale */}
+      {payStatus === 'confirmed' && !isDelivered && (
+        <div className="tc-final-box">
+          <div className="tc-final-title"><Rocket size={12} /> Livraison version finale</div>
+          <div style={{ fontSize: 11, color: 'var(--tx-3)', marginBottom: 8 }}>⚠️ Toutes les démos seront désactivées après livraison.</div>
+          <div className="tc-final-row">
+            <input className="tc-final-inp" placeholder="https://app.monbusiness.tn/..." value={finalUrl}
+              onChange={e => setFinalUrl(e.target.value)} />
+            <button className="tc-deliver-btn" onClick={deliverFinal} disabled={saving || !finalUrl.trim()}>
+              <Rocket size={11} /> Livrer
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Section 4 — Livré */}
+      {/* Livré */}
       {isDelivered && (
-        <div style={{ ...sSection, borderColor: 'rgba(16,185,129,0.3)' }}>
-          <div style={sTitle}><CheckCircle2 size={14} color="#10B981" /> Application livrée ✓</div>
-          <div style={{ fontSize: 12, color: 'var(--tx-2)', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Link2 size={11} />
-            <a href={meta.finalUrl || lead.pay_ref} target="_blank" rel="noreferrer"
-              style={{ color: 'var(--ac)', textDecoration: 'none' }}>
-              {meta.finalUrl || lead.pay_ref}
+        <div className="tc-final-box">
+          <div className="tc-final-title"><CheckCircle2 size={12} /> Application livrée ✓</div>
+          {meta.finalUrl && (
+            <a href={meta.finalUrl} target="_blank" rel="noreferrer"
+              style={{ fontSize: 11, color: 'var(--ac)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Link2 size={11} /> {meta.finalUrl}
             </a>
-          </div>
+          )}
         </div>
       )}
     </div>
   )
 }
 
-// ── Push notifications helper ──────────────────────────────────────────────
-function pushNotif(title, body) {
-  if (typeof Notification === 'undefined') return
-  if (Notification.permission !== 'granted') return
-  try { new Notification(title, { body: body.slice(0, 100), icon: '/favicon.ico', tag: 'walaup-admin-msg', renotify: true }) } catch(e) {}
-}
-
-// ─── TabClients principal ─────────────────────────────────────────────────────
+// ─── TabClients ───────────────────────────────────────────────────────────────
 export default function TabClients() {
-  const [leads, setLeads]       = useState([])
-  const [selected, setSelected] = useState(null)
-  const [messages, setMessages] = useState([])
-  const [search, setSearch]     = useState('')
-  const [msg, setMsg]           = useState('')
-  const [activePanel, setActivePanel] = useState('chat')
-  const [loading, setLoading]   = useState(true)
-  const [sending, setSending]   = useState(false)
+  const [view, setView]           = useState('list')
+  const [detailTab, setDetailTab] = useState('info')
+  const [leads, setLeads]         = useState([])
+  const [selected, setSelected]   = useState(null)
+  const [messages, setMessages]   = useState([])
+  const [search, setSearch]       = useState('')
+  const [msg, setMsg]             = useState('')
+  const [loading, setLoading]     = useState(true)
+  const [sending, setSending]     = useState(false)
   const chatRef    = useRef(null)
   const channelRef = useRef(null)
+  const pollRef    = useRef(null)
 
-  // ── Fetch leads ────────────────────────────────────────────────────────────
   const fetchLeads = useCallback(async () => {
     const { data } = await supabase.from('leads').select('*').order('created_at', { ascending: false })
     if (data) {
       setLeads(data)
-      setSelected(prev => prev ? (data.find(l => l.id === prev.id) || data[0]) : (data[0] || null))
+      setSelected(prev => prev ? (data.find(l => l.id === prev.id) || prev) : null)
     }
     setLoading(false)
   }, [])
 
-  // ── Fetch messages ─────────────────────────────────────────────────────────
   const fetchMessages = useCallback(async (leadId) => {
     if (!leadId) return
     const { data } = await supabase.from('messages').select('*').eq('lead_id', leadId).order('created_at', { ascending: true })
-    if (data) setMessages(data)
-    await supabase.from('leads').update({ unread_count: 0 }).eq('id', leadId)
-    setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight }, 50)
+    if (data) {
+      setMessages(data)
+      setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight }, 50)
+    }
   }, [])
 
-  // ── Init ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     fetchLeads()
-    const ch = supabase.channel('admin-leads')
+    const ch = supabase.channel('admin-leads-main')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, fetchLeads)
       .subscribe()
     return () => supabase.removeChannel(ch)
   }, [fetchLeads])
 
-  // ── Subscription messages du lead sélectionné ─────────────────────────────
   useEffect(() => {
-    if (!selected) return
+    if (!selected?.id) { setMessages([]); return }
+
     fetchMessages(selected.id)
+
+    // POLLING PRIMARY — garantit les messages toutes les 6s
+    clearInterval(pollRef.current)
+    pollRef.current = setInterval(() => fetchMessages(selected.id), 6000)
+
+    // REALTIME SECONDARY — instantané si WebSocket actif
     if (channelRef.current) supabase.removeChannel(channelRef.current)
-    channelRef.current = supabase.channel(`admin-msgs-${selected.id}-${Date.now()}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-        if (payload.new.lead_id !== selected.id) return
+    channelRef.current = supabase.channel(`admin-chat-${selected.id}-${Date.now()}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, pl => {
+        if (pl.new.lead_id !== selected.id) return
         setMessages(prev => {
-          if (prev.find(m => m.id === payload.new.id)) return prev
-          const withoutTemp = prev.filter(m => !(m._temp && m.sender === 'admin' && m.text === payload.new.text))
-          const next = [...withoutTemp, payload.new]
+          if (prev.find(m => m.id === pl.new.id)) return prev
+          const clean = prev.filter(m => !(m._temp && m.text === pl.new.text && m.sender === pl.new.sender))
+          const next = [...clean, pl.new]
           setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight }, 30)
           return next
         })
-        if (payload.new.sender === 'client' && document.hidden) {
-          pushNotif(`💬 ${selected?.name || 'Client'}`, payload.new.text)
-        }
       })
       .subscribe()
-    return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
+
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchMessages(selected.id) }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      clearInterval(pollRef.current)
+      if (channelRef.current) supabase.removeChannel(channelRef.current)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [selected?.id, fetchMessages])
 
-  // ── FIX : visibilitychange → refetch messages quand l'onglet redevient actif
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        fetchLeads()
-        if (selected?.id) fetchMessages(selected.id)
-      }
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [selected?.id, fetchLeads, fetchMessages])
+  const openClient = (lead) => {
+    setSelected(lead)
+    setView('detail')
+    setDetailTab('info')
+    setMessages([])
+  }
 
-  // Demander permission push
-  useEffect(() => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      Notification.requestPermission()
-    }
-  }, [])
+  const backToList = () => {
+    setView('list')
+    clearInterval(pollRef.current)
+    if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null }
+  }
 
   const sendMsg = async () => {
     if (!msg.trim() || !selected || sending) return
     setSending(true)
-    const text = msg.trim()
-    setMsg('')
-    const tempMsg = { id: `temp-${Date.now()}`, lead_id: selected.id, sender: 'admin', text, created_at: new Date().toISOString(), _temp: true }
-    setMessages(prev => [...prev, tempMsg])
+    const text = msg.trim(); setMsg('')
+    const temp = { id: `temp-${Date.now()}`, lead_id: selected.id, sender: 'admin', text, created_at: new Date().toISOString(), _temp: true }
+    setMessages(prev => [...prev, temp])
     setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight }, 30)
     await supabase.from('messages').insert([{ lead_id: selected.id, sender: 'admin', text }])
     await supabase.from('leads').update({ last_message: text, last_message_at: new Date().toISOString() }).eq('id', selected.id)
@@ -373,169 +577,133 @@ export default function TabClients() {
   const filtered = leads.filter(l =>
     (l.name || '').toLowerCase().includes(search.toLowerCase()) ||
     (l.phone || '').includes(search) ||
-    (l.app || l.type || '').toLowerCase().includes(search.toLowerCase())
+    (l.type || '').toLowerCase().includes(search.toLowerCase())
   )
-
-  const CSS = `
-    .adm-cl { display:flex; height:100%; overflow:hidden; }
-    .adm-cl-list { width:272px; flex-shrink:0; border-right:1px solid rgba(255,255,255,0.07); display:flex; flex-direction:column; }
-    .adm-cl-search { padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); position:relative; }
-    .adm-cl-sinp { width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.09); border-radius:10px; padding:8px 10px 8px 32px; color:var(--tx); font-size:12px; outline:none; box-sizing:border-box; }
-    .adm-cl-sinp:focus { border-color:rgba(99,102,241,0.4); }
-    .adm-cl-sico { position:absolute; left:20px; top:50%; transform:translateY(-50%); pointer-events:none; }
-    .adm-cl-items { flex:1; overflow-y:auto; }
-    .adm-cl-items::-webkit-scrollbar { width:3px; }
-    .adm-cl-items::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:2px; }
-    .adm-cl-item { padding:11px 13px; border-bottom:1px solid rgba(255,255,255,0.04); cursor:pointer; transition:background 150ms; }
-    .adm-cl-item:hover { background:rgba(255,255,255,0.03); }
-    .adm-cl-item--active { background:rgba(99,102,241,0.08); }
-    .adm-cl-row1 { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
-    .adm-cl-iname { font-size:13px; font-weight:600; color:var(--tx); }
-    .adm-cl-itime { font-size:10px; color:var(--tx-3); }
-    .adm-cl-row2 { display:flex; justify-content:space-between; align-items:center; }
-    .adm-cl-imsg { font-size:11px; color:var(--tx-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; }
-    .adm-cl-ibadge { width:16px; height:16px; border-radius:8px; background:var(--red); font-size:9px; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; }
-    .adm-cl-detail { flex:1; display:flex; flex-direction:column; min-width:0; overflow:hidden; }
-    .adm-cl-info { padding:12px 16px; border-bottom:1px solid rgba(255,255,255,0.07); display:flex; align-items:center; gap:10px; flex-shrink:0; flex-wrap:wrap; }
-    .adm-cl-avatar { width:36px; height:36px; border-radius:50%; flex-shrink:0; background:linear-gradient(135deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; color:#fff; font-family:'Space Grotesk',sans-serif; }
-    .adm-cl-meta { flex:1; min-width:0; }
-    .adm-cl-meta-name { font-weight:700; font-size:14px; color:var(--tx); }
-    .adm-cl-meta-app { font-size:11px; color:var(--tx-3); margin-top:2px; }
-    .adm-badge { padding:2px 9px; border-radius:20px; font-size:10px; font-weight:700; }
-    .adm-status-bar { padding:8px 14px; border-bottom:1px solid rgba(255,255,255,0.06); display:flex; gap:5px; flex-wrap:wrap; align-items:center; flex-shrink:0; }
-    .adm-status-btn { padding:4px 9px; border-radius:7px; font-size:10px; font-weight:600; cursor:pointer; border:1px solid rgba(255,255,255,0.1); background:transparent; color:var(--tx-2); transition:all 150ms; }
-    .adm-status-btn:hover { background:rgba(99,102,241,0.1); color:var(--tx); }
-    .adm-status-btn--active { background:rgba(99,102,241,0.15); border-color:rgba(99,102,241,0.4); color:var(--ac); }
-    .adm-panel-tabs { display:flex; border-bottom:1px solid rgba(255,255,255,0.06); flex-shrink:0; }
-    .adm-ptab { flex:1; padding:9px; text-align:center; font-size:12px; font-weight:600; color:var(--tx-3); cursor:pointer; transition:all 150ms; border-bottom:2px solid transparent; }
-    .adm-ptab--active { color:var(--ac); border-bottom-color:var(--ac); }
-    .adm-chat { flex:1; overflow-y:auto; padding:14px 16px; display:flex; flex-direction:column; gap:7px; }
-    .adm-chat::-webkit-scrollbar { width:3px; }
-    .adm-chat::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:2px; }
-    .adm-bubble { max-width:72%; padding:8px 12px; border-radius:14px; font-size:13px; line-height:1.5; word-break:break-word; }
-    .adm-bubble--admin { align-self:flex-end; background:linear-gradient(135deg,#6366F1,#8B5CF6); color:#fff; border-bottom-right-radius:4px; }
-    .adm-bubble--client { align-self:flex-start; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); color:var(--tx); border-bottom-left-radius:4px; }
-    .adm-bubble-ts { font-size:10px; opacity:.6; margin-top:3px; text-align:right; }
-    .adm-chat-inp { padding:10px 12px; border-top:1px solid rgba(255,255,255,0.07); display:flex; gap:8px; align-items:flex-end; flex-shrink:0; }
-    .adm-chat-field { flex:1; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.09); border-radius:10px; padding:8px 12px; color:var(--tx); font-size:13px; outline:none; resize:none; font-family:'Inter',sans-serif; max-height:100px; }
-    .adm-chat-field:focus { border-color:rgba(99,102,241,0.4); }
-    .adm-chat-send { width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,#6366F1,#8B5CF6); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#fff; transition:transform 150ms; flex-shrink:0; }
-    .adm-chat-send:hover { transform:scale(1.08); }
-    .adm-chat-send:disabled { opacity:.5; cursor:not-allowed; transform:none; }
-    @media(max-width:768px) { .adm-cl-list { width:200px; } }
-    @media(max-width:580px) { .adm-cl { flex-direction:column; } .adm-cl-list { width:100%; height:200px; border-right:none; border-bottom:1px solid rgba(255,255,255,0.07); } }
-  `
 
   return (
     <>
       <style>{CSS}</style>
-      <div className="adm-cl">
+      <div className="tc-root">
 
-        {/* ── Liste leads ── */}
-        <div className="adm-cl-list">
-          <div className="adm-cl-search">
-            <Search size={12} color="var(--tx-3)" className="adm-cl-sico" />
-            <input className="adm-cl-sinp" placeholder="Rechercher..." value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
-          <div className="adm-cl-items">
-            {loading ? (
-              <div style={sLoadingList}>Chargement…</div>
-            ) : filtered.length === 0 ? (
-              <div style={sLoadingList}>Aucun client.</div>
-            ) : filtered.map(lead => {
-              const sc = STATUS_CONFIG[lead.status] || STATUS_CONFIG.new
-              return (
-                <div key={lead.id}
-                  className={`adm-cl-item${selected?.id === lead.id ? ' adm-cl-item--active' : ''}`}
-                  onClick={() => { setSelected(lead); setActivePanel('chat') }}
-                >
-                  <div className="adm-cl-row1">
-                    <span className="adm-cl-iname">{lead.name}</span>
-                    <span className="adm-cl-itime">
-                      {lead.last_message_at ? new Date(lead.last_message_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}
-                    </span>
-                  </div>
-                  <div className="adm-cl-row2">
-                    <span className="adm-cl-imsg">{lead.last_message || lead.type || '—'}</span>
-                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                      <span className="adm-badge" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
-                      {(lead.unread_count > 0) && <div className="adm-cl-ibadge">{lead.unread_count}</div>}
+        {/* ══ LIST ══ */}
+        {view === 'list' && (
+          <div className="tc-list">
+            <div className="tc-list-head">
+              <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 800, fontSize: 18, color: 'var(--tx)' }}>Clients</span>
+              <div className="tc-list-search">
+                <Search size={13} color="var(--tx-3)" className="tc-sico" />
+                <input className="tc-sinp" placeholder="Rechercher..." value={search} onChange={e => setSearch(e.target.value)} />
+              </div>
+              <button onClick={fetchLeads} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'var(--tx-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <RefreshCw size={12} />
+              </button>
+            </div>
+            <div className="tc-list-scroll">
+              {loading ? (
+                <div style={{ padding: 20, textAlign: 'center', color: 'var(--tx-3)', fontSize: 12 }}>Chargement…</div>
+              ) : filtered.length === 0 ? (
+                <div className="tc-empty"><MessageSquare size={28} color="var(--border)" /><span>Aucun client</span></div>
+              ) : filtered.map(lead => {
+                const sc = STATUS_CONFIG[lead.status] || STATUS_CONFIG.new
+                return (
+                  <div key={lead.id} className="tc-lead-card" onClick={() => openClient(lead)}>
+                    <div className="tc-avatar">{(lead.name || 'AA').slice(0, 2).toUpperCase()}</div>
+                    <div className="tc-lead-info">
+                      <div className="tc-lead-name">{lead.name}</div>
+                      <div className="tc-lead-meta">{lead.phone}{lead.type ? ` · ${lead.type}` : ''}</div>
+                    </div>
+                    <div className="tc-lead-right">
+                      <span className="tc-badge" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
+                      {lead.unread_count > 0 && <div className="tc-unread-dot">{lead.unread_count}</div>}
                     </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* ── Détail lead ── */}
-        {!selected ? (
-          <div style={sEmptyState}>
-            <MessageSquare size={32} color="var(--border)" />
-            <span>Sélectionnez un client</span>
-          </div>
-        ) : (
-          <div className="adm-cl-detail">
-            {/* Header */}
-            <div className="adm-cl-info">
-              <div className="adm-cl-avatar">{(selected.name || 'AA').slice(0, 2).toUpperCase()}</div>
-              <div className="adm-cl-meta">
-                <div className="adm-cl-meta-name">{selected.name}</div>
-                <div className="adm-cl-meta-app">{selected.type} · {selected.phone}</div>
+        {/* ══ DETAIL ══ */}
+        {view === 'detail' && selected && (
+          <div className="tc-detail">
+            <div className="tc-detail-head">
+              <button className="tc-back-btn" onClick={backToList}><ArrowLeft size={13} /> Liste</button>
+              <div className="tc-avatar tc-avatar--sm">{(selected.name || 'AA').slice(0, 2).toUpperCase()}</div>
+              <span className="tc-detail-name">{selected.name} · {selected.phone}</span>
+              <div className="tc-tab-btns">
+                <button className={`tc-tab-btn${detailTab === 'info' ? ' tc-tab-btn--active' : ''}`} onClick={() => setDetailTab('info')}>
+                  <User size={12} /> Infos
+                </button>
+                <button className={`tc-tab-btn${detailTab === 'messages' ? ' tc-tab-btn--active' : ''}`}
+                  onClick={() => { setDetailTab('messages'); setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight }, 80) }}>
+                  <MessageSquare size={12} /> Messages
+                </button>
               </div>
-              {selected.pack && <span className="adm-badge" style={sPackBadge}>{selected.pack}</span>}
-              {(() => {
-                const sc = STATUS_CONFIG[selected.status] || STATUS_CONFIG.new
-                return <span className="adm-badge" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
-              })()}
             </div>
 
-            {/* Barre de statuts */}
-            <div className="adm-status-bar">
-              <span style={sStatusLabel}>Statut :</span>
-              {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-                <button key={k}
-                  className={`adm-status-btn${selected.status === k ? ' adm-status-btn--active' : ''}`}
-                  onClick={() => changeStatus(k)}>{v.label}</button>
-              ))}
-            </div>
+            {/* Infos */}
+            {detailTab === 'info' && (
+              <div className="tc-info">
+                <div className="tc-section">
+                  <div className="tc-section-title"><User size={11} /> Coordonnées</div>
+                  <div className="tc-grid2">
+                    <div className="tc-field"><label>Nom</label><span>{selected.name || '—'}</span></div>
+                    <div className="tc-field"><label>Téléphone</label><span>{selected.phone || '—'}</span></div>
+                    <div className="tc-field"><label>Email</label><span>{selected.email || '—'}</span></div>
+                    <div className="tc-field"><label>Source</label><span>{selected.source || '—'}</span></div>
+                  </div>
+                </div>
+                <div className="tc-section">
+                  <div className="tc-section-title"><AlertCircle size={11} /> Détails demande</div>
+                  <div className="tc-grid2">
+                    <div className="tc-field"><label>Type app</label><span>{selected.type || '—'}</span></div>
+                    <div className="tc-field"><label>Pack</label><span>{selected.pack || '—'}</span></div>
+                    <div className="tc-field"><label>Date</label><span>{selected.created_at ? new Date(selected.created_at).toLocaleDateString('fr-FR') : '—'}</span></div>
+                    <div className="tc-field"><label>Statut</label>
+                      <span style={{ color: STATUS_CONFIG[selected.status]?.color || 'var(--tx-2)' }}>
+                        {STATUS_CONFIG[selected.status]?.label || selected.status}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="tc-status-bar">
+                    <span className="tc-status-bar-label">Changer :</span>
+                    {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+                      <button key={k} className={`tc-status-btn${selected.status === k ? ' tc-status-btn--active' : ''}`}
+                        onClick={() => changeStatus(k)}>{v.label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="tc-section">
+                  <DemoPanel lead={selected} onRefresh={fetchLeads} />
+                </div>
+              </div>
+            )}
 
-            {/* Onglets */}
-            <div className="adm-panel-tabs">
-              <div className={`adm-ptab${activePanel === 'chat' ? ' adm-ptab--active' : ''}`} onClick={() => setActivePanel('chat')}>💬 Chat</div>
-              <div className={`adm-ptab${activePanel === 'demos' ? ' adm-ptab--active' : ''}`} onClick={() => setActivePanel('demos')}>🚀 Démo & Livraison</div>
-            </div>
-
-            {/* Panneau Chat */}
-            {activePanel === 'chat' && (
+            {/* Messages */}
+            {detailTab === 'messages' && (
               <>
-                <div className="adm-chat" ref={chatRef}>
-                  {messages.length === 0 && <div style={sNoMessages}>Aucun message. Commencez la conversation.</div>}
+                <div className="tc-chat" ref={chatRef}>
+                  {messages.length === 0 && <div className="tc-no-msgs">Aucun message — commencez la conversation.</div>}
                   {messages.map(m => (
-                    <div key={m.id} className={`adm-bubble adm-bubble--${m.sender}`}>
+                    <div key={m.id} className={`tc-bubble tc-bubble--${m.sender}`}>
                       {m.text}
-                      <div className="adm-bubble-ts">
+                      <div className="tc-bubble-ts">
                         {new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                        {m.sender === 'admin' && <CheckCheck size={10} style={sCheckMark} />}
+                        {m.sender === 'admin' && <CheckCheck size={10} style={{ marginLeft: 4 }} />}
                       </div>
                     </div>
                   ))}
                 </div>
-                <div className="adm-chat-inp">
-                  <textarea className="adm-chat-field" placeholder="Écrire un message..." value={msg} rows={1}
+                <div className="tc-chat-inp">
+                  <textarea className="tc-chat-field" placeholder="Écrire un message..." value={msg} rows={1}
                     onChange={e => setMsg(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
                   />
-                  <button className="adm-chat-send" onClick={sendMsg} disabled={sending || !msg.trim()}>
+                  <button className="tc-chat-send" onClick={sendMsg} disabled={sending || !msg.trim()}>
                     <Send size={14} />
                   </button>
                 </div>
               </>
-            )}
-
-            {/* Panneau Démo & Livraison */}
-            {activePanel === 'demos' && (
-              <DemoPanel key={selected.id} lead={selected} onRefresh={fetchLeads} />
             )}
           </div>
         )}
