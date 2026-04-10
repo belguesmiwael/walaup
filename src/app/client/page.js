@@ -124,13 +124,15 @@ const CSS = `
   }
 `
 
+const sLoadingTxt = { color: 'var(--tx-3)', fontSize: 13 }
+
 function LoadingScreen() {
   return (
     <>
       <style>{CSS}</style>
       <div className="cl-loading">
         <div className="cl-spinner" />
-        <p style= color: 'var(--tx-3)', fontSize: 13 >Chargement de votre espace...</p>
+        <p style={sLoadingTxt}>Chargement de votre espace...</p>
       </div>
     </>
   )
