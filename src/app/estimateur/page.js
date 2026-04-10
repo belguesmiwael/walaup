@@ -104,88 +104,100 @@ function StepIndicator({ current }) {
     '  0%   { background-position: 0% center; }',
     '  100% { background-position: 200% center; }',
     '}',
-    '.est-seg-done {',
+    '.est-prog-done {',
     '  background: linear-gradient(90deg,#6366F1,#8B5CF6);',
     '  box-shadow: 0 0 6px rgba(99,102,241,0.45);',
     '}',
-    '.est-seg-wave {',
+    '.est-prog-wave {',
     '  background: repeating-linear-gradient(',
     '    90deg,',
-    '    rgba(99,102,241,0.25) 0px,',
+    '    rgba(99,102,241,0.35) 0px,',
     '    #8B5CF6 10px,',
     '    #a78bfa 18px,',
-    '    rgba(99,102,241,0.25) 28px',
+    '    rgba(99,102,241,0.35) 28px',
     '  );',
     '  background-size: 56px 100%;',
     '  animation: est-wave 1.1s linear infinite;',
     '  box-shadow: 0 0 10px rgba(139,92,246,0.55);',
     '}',
-    '.est-seg-empty { background: rgba(255,255,255,0.07); }',
   ].join('\n')
 
-  const items = []
+  const total = STEP_LABELS.length
+  const ratio = total > 1 ? (current - 1) / (total - 1) : 0
+  const r100  = (ratio * 100).toFixed(2)
+  const r30   = (ratio * 30).toFixed(2)
+  // Progress line: from center of circle-1 (left:15px) to center of circle-N
+  // Full span = 100% - 30px, progress = ratio * that span
+  const progressW = ratio === 0 ? '0px' : 'calc(' + r100 + '% - ' + r30 + 'px)'
+  const progClass  = ratio >= 1 ? 'est-prog-done' : ratio > 0 ? 'est-prog-wave' : ''
 
-  STEP_LABELS.forEach(function(label, i) {
-    const n    = i + 1
-    const done = n < current
-    const act  = n === current
-
-    const circleStyle = {
-      width: 30, height: 30, borderRadius: '50%',
-      background: done ? 'var(--ac)' : act ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
-      border: '2px solid ' + (done ? 'var(--ac)' : act ? 'var(--ac)' : 'rgba(255,255,255,0.1)'),
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      transition: 'all 0.3s cubic-bezier(0.16,1,0.3,1)',
-      boxShadow: act  ? '0 0 16px rgba(99,102,241,0.55)'
-               : done ? '0 0 10px rgba(99,102,241,0.28)'
-               : 'none',
-    }
-    const numStyle = {
-      fontSize: 11, fontWeight: 700,
-      fontFamily: 'var(--font-mono)',
-      color: act ? 'var(--ac)' : 'var(--tx-3)',
-    }
-    const labelStyle = {
-      fontSize: 9, fontWeight: 600,
-      letterSpacing: '0.04em', textTransform: 'uppercase',
-      color: act ? 'var(--tx)' : done ? 'var(--tx-2)' : 'var(--tx-3)',
-      whiteSpace: 'nowrap', textAlign: 'center',
-      transition: 'color 0.3s ease',
-    }
-    const itemStyle = {
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', gap: 4, flexShrink: 0,
-    }
-
-    items.push(
-      <div key={'s' + n} style={itemStyle}>
-        <div style={circleStyle}>
-          {done
-            ? <Check size={14} color="white" strokeWidth={2.5} />
-            : <span style={numStyle}>{n}</span>
-          }
-        </div>
-        <span style={labelStyle}>{label}</span>
-      </div>
-    )
-
-    if (i < STEP_LABELS.length - 1) {
-      const segClass = done ? 'est-seg-done' : act ? 'est-seg-wave' : 'est-seg-empty'
-      const segStyle = {
-        flex: 1, height: 2, borderRadius: 2,
-        marginTop: 14, flexShrink: 1,
-        transition: 'background 0.3s ease',
-      }
-      items.push(<div key={'l' + n} style={segStyle} className={segClass} />)
-    }
-  })
-
-  const sWrap = { display: 'flex', alignItems: 'flex-start', width: '100%' }
+  // Styles
+  const sOuter      = { position: 'relative', width: '100%', paddingBottom: 4 }
+  const sCircleRow  = { position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 30, marginBottom: 6 }
+  const sBaseLine   = { position: 'absolute', top: '50%', left: 15, right: 15, height: 2, marginTop: -1, background: 'rgba(255,255,255,0.07)', borderRadius: 1, zIndex: 0 }
+  const sProgressLine = { position: 'absolute', top: '50%', left: 15, width: progressW, height: 2, marginTop: -1, borderRadius: 1, zIndex: 0, transition: 'width 0.5s cubic-bezier(0.16,1,0.3,1)' }
+  const sLabelRow   = { display: 'flex', justifyContent: 'space-between' }
 
   return (
     <>
       <style>{waveCss}</style>
-      <div style={sWrap}>{items}</div>
+      <div style={sOuter}>
+
+        {/* ── Circles row (lines behind via absolute) ── */}
+        <div style={sCircleRow}>
+          <div style={sBaseLine} />
+          <div style={sProgressLine} className={progClass} />
+          {STEP_LABELS.map(function(label, i) {
+            const n    = i + 1
+            const done = n < current
+            const act  = n === current
+            const cStyle = {
+              width: 30, height: 30, borderRadius: '50%',
+              flexShrink: 0, position: 'relative', zIndex: 1,
+              // Solid background so the line behind is hidden under the circle
+              background: done ? 'var(--ac)' : act ? '#1a1b3a' : '#0d1020',
+              border: '2px solid ' + (done ? 'var(--ac)' : act ? 'var(--ac)' : 'rgba(255,255,255,0.15)'),
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.3s cubic-bezier(0.16,1,0.3,1)',
+              boxShadow: act  ? '0 0 16px rgba(99,102,241,0.55)'
+                       : done ? '0 0 10px rgba(99,102,241,0.28)'
+                       : 'none',
+            }
+            const nStyle = {
+              fontSize: 11, fontWeight: 700,
+              fontFamily: 'var(--font-mono)',
+              color: act ? 'var(--ac)' : 'var(--tx-3)',
+            }
+            return (
+              <div key={n} style={cStyle}>
+                {done
+                  ? <Check size={14} color="white" strokeWidth={2.5} />
+                  : <span style={nStyle}>{n}</span>
+                }
+              </div>
+            )
+          })}
+        </div>
+
+        {/* ── Labels row ── */}
+        <div style={sLabelRow}>
+          {STEP_LABELS.map(function(label, i) {
+            const n    = i + 1
+            const done = n < current
+            const act  = n === current
+            const lStyle = {
+              fontSize: 9, fontWeight: 600,
+              letterSpacing: '0.04em', textTransform: 'uppercase',
+              color: act ? 'var(--tx)' : done ? 'var(--tx-2)' : 'var(--tx-3)',
+              whiteSpace: 'nowrap', textAlign: 'center',
+              transition: 'color 0.3s ease',
+              flex: 1,
+            }
+            return <span key={n} style={lStyle}>{label}</span>
+          })}
+        </div>
+
+      </div>
     </>
   )
 }
@@ -495,8 +507,8 @@ function StepFeatures({ features, selected, onToggle }) {
                   transform: active ? 'scale(1.01)' : 'scale(1)',
                   boxShadow: active ? '0 3px 14px rgba(99,102,241,0.15)' : 'none',
                 }
+                const FeatIcon = feat.icon
                 const sTop    = { display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }
-                const sIco    = { color: active ? 'var(--ac)' : 'var(--tx-2)', flexShrink:0 }
                 const sCheck  = {
                   width:17, height:17, borderRadius:'50%', flexShrink:0,
                   background: active ? 'var(--ac)' : 'rgba(255,255,255,0.06)',
@@ -512,7 +524,7 @@ function StepFeatures({ features, selected, onToggle }) {
                 return (
                   <button key={feat.id} onClick={function() { onToggle(feat.id); WalaupSound && WalaupSound.click && WalaupSound.click() }} style={sBtn}>
                     <div style={sTop}>
-                      <feat.icon size={18} color={active ? 'var(--ac)' : 'var(--tx-2)'} strokeWidth={1.8} />
+                      <FeatIcon size={18} color={active ? 'var(--ac)' : 'var(--tx-2)'} strokeWidth={1.8} />
                       <div style={sCheck}>{active && <Check size={9} color="white" strokeWidth={3} />}</div>
                     </div>
                     <div style={sName}>{feat.name}</div>
