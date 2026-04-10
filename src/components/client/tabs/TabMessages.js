@@ -253,14 +253,18 @@ export default function TabMessages({ lead, session }) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() }
   }
 
+const sIconLg  = { fontSize: 32 }
+const sTextSm  = { fontSize: 13 }
+const sTitleH2 = { fontFamily: "'Space Grotesk',sans-serif", fontWeight: 800, fontSize: 18, color: 'var(--tx)', marginBottom: 16 }
+
   if (!lead) {
     return (
       <>
         <style>{CSS}</style>
         <div className="tm-root">
           <div className="tm-center">
-            <span style= fontSize: 32 >💬</span>
-            <p style= fontSize: 13 >Aucun projet actif — créez votre demande d&apos;abord.</p>
+            <span style={sIconLg}>💬</span>
+            <p style={sTextSm}>Aucun projet actif — créez votre demande d&apos;abord.</p>
           </div>
         </div>
       </>
@@ -271,7 +275,7 @@ export default function TabMessages({ lead, session }) {
     <>
       <style>{CSS}</style>
       <div className="tm-root">
-        <h2 style= fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18, color: 'var(--tx)', marginBottom: 16 >Messages</h2>
+        <h2 style={sTitleH2}>Messages</h2>
 
         <div className="tm-msgs">
           {loading && (
@@ -279,8 +283,8 @@ export default function TabMessages({ lead, session }) {
           )}
           {!loading && messages.length === 0 && (
             <div className="tm-center">
-              <span style= fontSize: 28 >✉️</span>
-              <p style= fontSize: 13 >Commencez la conversation avec l&apos;équipe Walaup. Nous répondons en moins de 24h.</p>
+              <span style={sIconLg}>✉️</span>
+              <p style={sTextSm}>Commencez la conversation avec l&apos;équipe Walaup. Nous répondons en moins de 24h.</p>
             </div>
           )}
           {messages.map(msg => (
