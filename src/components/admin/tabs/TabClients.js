@@ -305,7 +305,9 @@ export default function TabClients() {
     fetchMessages(selected.id)
     if (channelRef.current) supabase.removeChannel(channelRef.current)
     channelRef.current = supabase.channel(`msgs-${selected.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `lead_id=eq.${selected.id}` }, payload => {
+      // PAS de filter= (évite le problème REPLICA IDENTITY) — filtrage côté client
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+        if (payload.new.lead_id !== selected.id) return
         setMessages(prev => {
           if (prev.find(m => m.id === payload.new.id)) return prev
           const withoutTemp = prev.filter(m => !(m._temp && m.sender === 'admin' && m.text === payload.new.text))
@@ -313,7 +315,6 @@ export default function TabClients() {
           setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight }, 30)
           return next
         })
-        // Notification push admin si message client reçu + page pas en focus
         if (payload.new.sender === 'client' && document.hidden) {
           pushNotif(`💬 ${selected?.name || 'Client'}`, payload.new.text)
         }
