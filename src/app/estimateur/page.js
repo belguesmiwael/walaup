@@ -39,18 +39,18 @@ const PLATFORMS = [
 const USER_RANGES = ['1–5', '5–20', '20–100', '100+']
 
 const DEFAULT_FEATURES = [
-  { id:'f1',  group:'Gestion',       name:'Tableau de bord',    icon:LayoutDashboard, price:0,   days:0, desc:"Vue d'ensemble des données"  },
-  { id:'f2',  group:'Gestion',       name:'Gestion du stock',   icon:Package,         price:80,  days:2, desc:'Entrées, sorties, alertes'   },
-  { id:'f3',  group:'Gestion',       name:'Caisse & Paiement',  icon:CreditCard,      price:60,  days:2, desc:'Encaissement, reçus'         },
-  { id:'f4',  group:'Gestion',       name:'Gestion employés',   icon:Users,           price:70,  days:2, desc:'Présences, fiches, paiements'},
-  { id:'f5',  group:'Clients',       name:'Suivi clients',      icon:UserCheck,       price:50,  days:1, desc:'Fiche client, historique'    },
-  { id:'f6',  group:'Clients',       name:'Suivi des dettes',   icon:TrendingDown,    price:60,  days:2, desc:'Créances, relances auto'     },
-  { id:'f7',  group:'Clients',       name:'Réservations',       icon:Calendar,        price:80,  days:3, desc:'Agenda et RDV en ligne'      },
-  { id:'f8',  group:'Communication', name:'Notifications push', icon:Bell,            price:40,  days:1, desc:'Alertes et rappels'          },
-  { id:'f9',  group:'Communication', name:'Chat interne',       icon:MessageSquare,   price:80,  days:3, desc:'Messagerie équipe'           },
-  { id:'f10', group:'Rapports',      name:'Rapports & Stats',   icon:BarChart2,       price:60,  days:2, desc:'Graphes, exports, analyses'  },
-  { id:'f11', group:'Rapports',      name:'Export PDF',         icon:FileText,        price:30,  days:1, desc:'Factures, reçus en PDF'      },
-  { id:'f12', group:'Avancé',        name:'API & Intégrations', icon:Link2,           price:120, days:4, desc:"Connecter d'autres outils"   },
+  { id:'f1',  group:'Gestion',       name:'Tableau de bord',    icon:LayoutDashboard, color:'#6366F1', price:0,   days:0, desc:"Vue d'ensemble des données"  },
+  { id:'f2',  group:'Gestion',       name:'Gestion du stock',   icon:Package,         color:'#F59E0B', price:80,  days:2, desc:'Entrées, sorties, alertes'   },
+  { id:'f3',  group:'Gestion',       name:'Caisse & Paiement',  icon:CreditCard,      color:'#10B981', price:60,  days:2, desc:'Encaissement, reçus'         },
+  { id:'f4',  group:'Gestion',       name:'Gestion employés',   icon:Users,           color:'#3B82F6', price:70,  days:2, desc:'Présences, fiches, paiements'},
+  { id:'f5',  group:'Clients',       name:'Suivi clients',      icon:UserCheck,       color:'#EC4899', price:50,  days:1, desc:'Fiche client, historique'    },
+  { id:'f6',  group:'Clients',       name:'Suivi des dettes',   icon:TrendingDown,    color:'#EF4444', price:60,  days:2, desc:'Créances, relances auto'     },
+  { id:'f7',  group:'Clients',       name:'Réservations',       icon:Calendar,        color:'#8B5CF6', price:80,  days:3, desc:'Agenda et RDV en ligne'      },
+  { id:'f8',  group:'Communication', name:'Notifications push', icon:Bell,            color:'#F97316', price:40,  days:1, desc:'Alertes et rappels'          },
+  { id:'f9',  group:'Communication', name:'Chat interne',       icon:MessageSquare,   color:'#06B6D4', price:80,  days:3, desc:'Messagerie équipe'           },
+  { id:'f10', group:'Rapports',      name:'Rapports & Stats',   icon:BarChart2,       color:'#84CC16', price:60,  days:2, desc:'Graphes, exports, analyses'  },
+  { id:'f11', group:'Rapports',      name:'Export PDF',         icon:FileText,        color:'#A78BFA', price:30,  days:1, desc:'Factures, reçus en PDF'      },
+  { id:'f12', group:'Avancé',        name:'API & Intégrations', icon:Link2,           color:'#34D399', price:120, days:4, desc:"Connecter d'autres outils"   },
 ]
 
 const PACKS = [
@@ -517,8 +517,14 @@ function StepFeatures({ features, selected, onToggle }) {
                   transform: active ? 'scale(1.01)' : 'scale(1)',
                   boxShadow: active ? '0 3px 14px rgba(99,102,241,0.15)' : 'none',
                 }
-                // Handle both React component (DEFAULT_FEATURES) and string (from Supabase JSON)
-                const FeatIcon = typeof feat.icon === 'string' ? (ICON_MAP[feat.icon] || Package) : (feat.icon || Package)
+                // Icon: always a valid Lucide component after merge
+                const FeatIcon  = typeof feat.icon === 'string' ? (ICON_MAP[feat.icon] || Package) : (feat.icon || Package)
+                const featColor = feat.color || '#6366F1'
+                const icoColor  = active ? '#ffffff' : featColor
+                const icoFilter = active
+                  ? 'drop-shadow(0 0 6px rgba(99,102,241,0.9))'
+                  : 'drop-shadow(0 0 5px ' + featColor + 'cc)'
+                const sIcoAnim  = { filter: icoFilter, animation: 'est-ico-pulse 2.2s ease-in-out infinite', flexShrink: 0 }
                 const sTop    = { display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }
                 const sCheck  = {
                   width:17, height:17, borderRadius:'50%', flexShrink:0,
@@ -535,7 +541,7 @@ function StepFeatures({ features, selected, onToggle }) {
                 return (
                   <button key={feat.id} onClick={function() { onToggle(feat.id); WalaupSound && WalaupSound.click && WalaupSound.click() }} style={sBtn}>
                     <div style={sTop}>
-                      <FeatIcon size={18} color={active ? 'var(--ac)' : 'var(--tx-2)'} strokeWidth={1.8} />
+                      <FeatIcon size={20} color={icoColor} strokeWidth={1.8} style={sIcoAnim} />
                       <div style={sCheck}>{active && <Check size={9} color="white" strokeWidth={3} />}</div>
                     </div>
                     <div style={sName}>{feat.name}</div>
@@ -773,8 +779,17 @@ export default function EstimateurPage() {
   useEffect(function() {
     supabase.from('config').select('value').eq('key','estimateur_features').single()
       .then(function(res) {
-        if (res.data && res.data.value && Array.isArray(res.data.value) && res.data.value.length > 0)
-          setFeatures(res.data.value)
+        if (res.data && res.data.value && Array.isArray(res.data.value) && res.data.value.length > 0) {
+          // Merge Supabase data with DEFAULT_FEATURES to preserve Lucide icons & colors
+          var merged = res.data.value.map(function(f) {
+            var def = DEFAULT_FEATURES.find(function(d) { return d.id === f.id })
+            return Object.assign({}, f, {
+              icon:  def ? def.icon  : (ICON_MAP[f.icon] || Package),
+              color: def ? def.color : (f.color || '#6366F1'),
+            })
+          })
+          setFeatures(merged)
+        }
       }).catch(function() {})
   }, [])
 
@@ -868,6 +883,7 @@ export default function EstimateurPage() {
     '.est-scroll::-webkit-scrollbar { width:4px; }',
     '.est-scroll::-webkit-scrollbar-track { background:transparent; }',
     '.est-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:4px; }',
+    '@keyframes est-ico-pulse { 0%,100% { opacity:0.8; transform:scale(1); } 50% { opacity:1; transform:scale(1.12); } }',
     '.est-step input:focus, .est-step textarea:focus { border-color:rgba(99,102,241,0.5) !important; box-shadow:0 0 0 3px rgba(99,102,241,0.1); }',
     'input::placeholder, textarea::placeholder { color:var(--tx-3); }',
     '@media (max-width:768px) { .est-layout { flex-direction:column !important; } .est-sidebar-d { display:none !important; } .est-sidebar-m { display:block !important; } .contact-grid { grid-template-columns:1fr !important; } }',
