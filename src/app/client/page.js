@@ -65,6 +65,8 @@ const CSS = `
   }
   .cl-scroll::-webkit-scrollbar { width: 4px; }
   .cl-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 4px; }
+  /* Messages tab : pas de padding, overflow hidden pour que la boite soit fixée en bas */
+  .cl-scroll--msgs { padding: 0 !important; overflow: hidden !important; display: flex; flex-direction: column; }
 
   /* ── Bouton nouvelle app (desktop flottant) ── */
   .cl-newapp-fab {
@@ -104,6 +106,7 @@ const CSS = `
     .cl-topbar       { display: flex; }
     .cl-sidebar-wrap { display: none; }
     .cl-scroll       { padding: 20px 16px 80px; }
+    .cl-scroll--msgs  { padding: 0 !important; }
     .cl-newapp-fab   { bottom: 76px; right: 16px; padding: 10px 14px; font-size: 12px; }
   }
   @media (min-width: 768px) {
@@ -282,9 +285,11 @@ export default function ClientPage() {
             <Link href="/" className="cl-topbar-btn cl-topbar-btn--back" onClick={() => WalaupSound.click()}>
               <ArrowLeft size={12} /> Accueil
             </Link>
-            <Link href="/estimateur" className="cl-topbar-btn cl-topbar-btn--newapp" onClick={() => WalaupSound.click()}>
-              <PlusCircle size={12} /> Nouvelle app
-            </Link>
+            {activeTab === 'projet' && (
+              <Link href="/estimateur" className="cl-topbar-btn cl-topbar-btn--newapp" onClick={() => WalaupSound.click()}>
+                <PlusCircle size={12} /> Nouvelle app
+              </Link>
+            )}
           </div>
           <span className="cl-topbar-logo">Walaup</span>
           <div className="cl-topbar-right">
@@ -310,7 +315,7 @@ export default function ClientPage() {
           </div>
 
           <main className="cl-main">
-            <div className="cl-scroll">
+            <div className={`cl-scroll${activeTab === 'messages' ? ' cl-scroll--msgs' : ''}`}>
               {TABS[activeTab]}
             </div>
           </main>
@@ -325,10 +330,12 @@ export default function ClientPage() {
           />
         </div>
 
-        {/* ── FAB Nouvelle app (visible partout) ── */}
-        <Link href="/estimateur" className="cl-newapp-fab" onClick={() => WalaupSound.click()}>
-          <PlusCircle size={16} /> Nouvelle app
-        </Link>
+        {/* ── FAB Nouvelle app — seulement sur tab Projet ── */}
+        {activeTab === 'projet' && (
+          <Link href="/estimateur" className="cl-newapp-fab" onClick={() => WalaupSound.click()}>
+            <PlusCircle size={16} /> Nouvelle app
+          </Link>
+        )}
 
       </div>
     </>
