@@ -9,121 +9,92 @@ import ClientBottomTabs from '@/components/client/ClientBottomTabs'
 import TabProjet from '@/components/client/tabs/TabProjet'
 import TabMessages from '@/components/client/tabs/TabMessages'
 import { TabAbonnement, TabPaiements, TabApps } from '@/components/client/tabs/index.js'
-import { LogOut, ArrowLeft } from 'lucide-react'
+import { LogOut, ArrowLeft, PlusCircle } from 'lucide-react'
 
 const CSS = `
   .cl-root {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: var(--bg-base);
-    z-index: 1000;
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; flex-direction: column; overflow: hidden;
+    background: var(--bg-base); z-index: 1000;
   }
 
   /* ── Top bar mobile ── */
   .cl-topbar {
-    display: none;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 16px;
-    height: 52px;
-    flex-shrink: 0;
+    display: none; align-items: center; justify-content: space-between;
+    padding: 0 12px; height: 52px; flex-shrink: 0;
     background: rgba(10,14,28,.92);
     border-bottom: 1px solid rgba(255,255,255,.06);
-    backdrop-filter: blur(20px);
-    position: relative;
-    z-index: 20;
+    backdrop-filter: blur(20px); position: relative; z-index: 20; gap: 6px;
   }
   .cl-topbar-logo {
-    font-family: var(--font-display);
-    font-size: 1.1rem;
-    font-weight: 800;
+    font-family: var(--font-display); font-size: 1.1rem; font-weight: 800;
     background: linear-gradient(135deg, #6366F1, #8B5CF6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    text-decoration: none;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; text-decoration: none; flex-shrink: 0;
   }
+  .cl-topbar-left { display: flex; align-items: center; gap: 6px; }
+  .cl-topbar-right { display: flex; align-items: center; gap: 6px; }
   .cl-topbar-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 12px;
-    border-radius: 10px;
-    font-size: 12px;
-    font-weight: 600;
-    font-family: var(--font-body);
-    cursor: pointer;
-    border: none;
-    transition: all .18s;
-    text-decoration: none;
+    display: flex; align-items: center; gap: 5px;
+    padding: 6px 10px; border-radius: 10px; font-size: 11px; font-weight: 600;
+    font-family: var(--font-body); cursor: pointer; border: none;
+    transition: all .18s; text-decoration: none; white-space: nowrap;
   }
   .cl-topbar-btn--back {
-    background: rgba(255,255,255,.06);
-    border: 1px solid rgba(255,255,255,.09);
-    color: var(--tx-2);
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.09); color: var(--tx-2);
   }
   .cl-topbar-btn--back:hover { background: rgba(255,255,255,.10); color: var(--tx); }
+  .cl-topbar-btn--newapp {
+    background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.25); color: var(--ac);
+  }
+  .cl-topbar-btn--newapp:hover { background: rgba(99,102,241,.2); }
   .cl-topbar-btn--logout {
-    background: rgba(248,113,113,.08);
-    border: 1px solid rgba(248,113,113,.16);
-    color: var(--red);
+    background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.16); color: var(--red);
   }
   .cl-topbar-btn--logout:hover { background: rgba(248,113,113,.16); }
 
   /* ── Body ── */
-  .cl-body {
-    display: flex;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-  }
+  .cl-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
   .cl-main {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    position: relative;
-    z-index: 1;
+    flex: 1; min-width: 0; display: flex; flex-direction: column;
+    overflow: hidden; position: relative; z-index: 1;
   }
   .cl-scroll {
-    flex: 1;
-    overflow-y: auto;
-    padding: 28px 28px 40px;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,.08) transparent;
+    flex: 1; overflow-y: auto; padding: 28px 28px 40px;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.08) transparent;
   }
   .cl-scroll::-webkit-scrollbar { width: 4px; }
   .cl-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 4px; }
 
-  /* ── Aurora ── */
-  .cl-orb {
-    position: fixed;
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 0;
+  /* ── Bouton nouvelle app (desktop flottant) ── */
+  .cl-newapp-fab {
+    position: fixed; bottom: 28px; right: 28px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 11px 18px; border-radius: 50px;
+    background: linear-gradient(135deg, #6366F1, #8B5CF6);
+    color: #fff; font-size: 13px; font-weight: 700;
+    font-family: var(--font-body); text-decoration: none;
+    box-shadow: 0 6px 24px rgba(99,102,241,.4);
+    transition: all .22s cubic-bezier(0.16,1,0.3,1);
+    z-index: 50;
   }
+  .cl-newapp-fab:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(99,102,241,.55); }
+  .cl-newapp-fab:active { transform: translateY(0); }
+
+  /* ── Aurora ── */
+  .cl-orb { position: fixed; border-radius: 50%; pointer-events: none; z-index: 0; }
   .cl-orb--1 {
-    width: 700px; height: 700px;
-    top: -280px; right: -220px;
+    width: 700px; height: 700px; top: -280px; right: -220px;
     background: radial-gradient(ellipse, rgba(99,102,241,.17) 0%, transparent 70%);
     filter: blur(60px);
   }
   .cl-orb--2 {
-    width: 550px; height: 550px;
-    bottom: -220px; left: 50px;
+    width: 550px; height: 550px; bottom: -220px; left: 50px;
     background: radial-gradient(ellipse, rgba(139,92,246,.13) 0%, transparent 70%);
     filter: blur(58px);
   }
   .cl-orb--3 {
-    width: 350px; height: 350px;
-    top: 40%; left: 30%;
+    width: 350px; height: 350px; top: 40%; left: 30%;
     background: radial-gradient(ellipse, rgba(245,158,11,.07) 0%, transparent 70%);
     filter: blur(55px);
   }
@@ -133,6 +104,7 @@ const CSS = `
     .cl-topbar       { display: flex; }
     .cl-sidebar-wrap { display: none; }
     .cl-scroll       { padding: 20px 16px 80px; }
+    .cl-newapp-fab   { bottom: 76px; right: 16px; padding: 10px 14px; font-size: 12px; }
   }
   @media (min-width: 768px) {
     .cl-bottomtabs-wrap { display: none; }
@@ -141,23 +113,14 @@ const CSS = `
   /* ── Loading ── */
   @keyframes cl-spin { to { transform: rotate(360deg); } }
   .cl-loading {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg-base);
-    gap: 14px;
-    z-index: 1000;
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; background: var(--bg-base); gap: 14px; z-index: 1000;
   }
   .cl-spinner {
-    width: 38px;
-    height: 38px;
-    border: 2px solid rgba(99,102,241,.18);
-    border-top-color: #6366F1;
-    border-radius: 50%;
-    animation: cl-spin .85s linear infinite;
+    width: 38px; height: 38px;
+    border: 2px solid rgba(99,102,241,.18); border-top-color: #6366F1;
+    border-radius: 50%; animation: cl-spin .85s linear infinite;
   }
 `
 
@@ -167,7 +130,7 @@ function LoadingScreen() {
       <style>{CSS}</style>
       <div className="cl-loading">
         <div className="cl-spinner" />
-        <p style={{ color: 'var(--tx-3)', fontSize: 13 }}>Chargement de votre espace...</p>
+        <p style= color: 'var(--tx-3)', fontSize: 13 >Chargement de votre espace...</p>
       </div>
     </>
   )
@@ -182,9 +145,8 @@ export default function ClientPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [unread, setUnread] = useState(0)
 
-  // ── Fullscreen — hide navbar + footer directly via DOM ──────────────────
+  // ── Fullscreen — hide navbar + footer ───────────────────────────────────
   useEffect(() => {
-    // Query all possible nav/header/footer elements from the root layout
     const toHide = [
       ...document.querySelectorAll('nav'),
       ...document.querySelectorAll('header'),
@@ -208,15 +170,11 @@ export default function ClientPage() {
       .channel(`cl-unread-${leadId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'messages', filter: `lead_id=eq.${leadId}` },
-        async () => {
-          const { count } = await supabase
-            .from('messages')
-            .select('id', { count: 'exact', head: true })
-            .eq('lead_id', leadId)
-            .eq('sender', 'admin')
-            .eq('is_read', false)
-          setUnread(count || 0)
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `lead_id=eq.${leadId}` },
+        async (payload) => {
+          if (payload.new.sender !== 'admin') return
+          // Ne compter que si l'onglet messages n'est pas actif
+          setUnread(prev => prev + 1)
         }
       )
       .subscribe()
@@ -272,7 +230,7 @@ export default function ClientPage() {
     }
   }, [router, listenUnread])
 
-  // ── Clear unread on messages tab ─────────────────────────────────────────
+  // ── Clear unread quand on ouvre l'onglet messages ────────────────────────
   useEffect(() => {
     if (activeTab === 'messages' && lead?.id && unread > 0) {
       supabase
@@ -316,19 +274,26 @@ export default function ClientPage() {
 
       <div className="cl-root">
 
-        {/* ── Mobile top bar : Accueil | Walaup | Quitter ── */}
+        {/* ── Mobile top bar ── */}
         <div className="cl-topbar">
-          <Link href="/" className="cl-topbar-btn cl-topbar-btn--back" onClick={() => WalaupSound.click()}>
-            <ArrowLeft size={13} /> Accueil
-          </Link>
+          <div className="cl-topbar-left">
+            <Link href="/" className="cl-topbar-btn cl-topbar-btn--back" onClick={() => WalaupSound.click()}>
+              <ArrowLeft size={12} /> Accueil
+            </Link>
+            <Link href="/estimateur" className="cl-topbar-btn cl-topbar-btn--newapp" onClick={() => WalaupSound.click()}>
+              <PlusCircle size={12} /> Nouvelle app
+            </Link>
+          </div>
           <span className="cl-topbar-logo">Walaup</span>
-          <button className="cl-topbar-btn cl-topbar-btn--logout" onClick={handleLogout}>
-            <LogOut size={13} /> Quitter
-          </button>
+          <div className="cl-topbar-right">
+            <button className="cl-topbar-btn cl-topbar-btn--logout" onClick={handleLogout}>
+              <LogOut size={12} /> Quitter
+            </button>
+          </div>
         </div>
 
         <div className="cl-body">
-          {/* Desktop sidebar — contient déjà le bouton retour accueil + déconnexion */}
+          {/* Desktop sidebar */}
           <div className="cl-sidebar-wrap">
             <ClientSidebar
               activeTab={activeTab}
@@ -357,6 +322,11 @@ export default function ClientPage() {
             unread={unread}
           />
         </div>
+
+        {/* ── FAB Nouvelle app (visible partout) ── */}
+        <Link href="/estimateur" className="cl-newapp-fab" onClick={() => WalaupSound.click()}>
+          <PlusCircle size={16} /> Nouvelle app
+        </Link>
 
       </div>
     </>
