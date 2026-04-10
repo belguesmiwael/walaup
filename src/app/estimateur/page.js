@@ -77,6 +77,16 @@ const PACKS = [
   },
 ]
 
+// Map string name → Lucide component (used when features come from Supabase JSON)
+const ICON_MAP = {
+  LayoutDashboard, Package, CreditCard, Users, UserCheck, TrendingDown,
+  Calendar, Bell, MessageSquare, BarChart2, FileText, Link2,
+  Coffee, Stethoscope, ShoppingBag, Wrench, GraduationCap, MoreHorizontal,
+  Zap, Shield, Rocket, Crown, Calculator, Monitor, Smartphone, Layers,
+  Building2, Plus, Target, Lock, Check, ChevronRight, ChevronLeft,
+  Send, CheckCircle2, Clock, User, Phone, Mail,
+}
+
 const STEP_LABELS = ['Secteur','Base','Fonctionnalités','Pack','Contact']
 
 // ─── Shared Styles ────────────────────────────────────────────────────────────
@@ -507,7 +517,8 @@ function StepFeatures({ features, selected, onToggle }) {
                   transform: active ? 'scale(1.01)' : 'scale(1)',
                   boxShadow: active ? '0 3px 14px rgba(99,102,241,0.15)' : 'none',
                 }
-                const FeatIcon = feat.icon
+                // Handle both React component (DEFAULT_FEATURES) and string (from Supabase JSON)
+                const FeatIcon = typeof feat.icon === 'string' ? (ICON_MAP[feat.icon] || Package) : (feat.icon || Package)
                 const sTop    = { display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }
                 const sCheck  = {
                   width:17, height:17, borderRadius:'50%', flexShrink:0,
