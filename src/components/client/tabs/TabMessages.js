@@ -17,25 +17,15 @@ function formatTime(ts) {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 }
 
-// ── Push notifications helpers ──────────────────────────────────────────────
 async function requestNotifPermission() {
   if (typeof Notification === 'undefined') return
-  if (Notification.permission === 'default') {
-    await Notification.requestPermission()
-  }
+  if (Notification.permission === 'default') await Notification.requestPermission()
 }
 
 function pushNotif(title, body) {
   if (typeof Notification === 'undefined') return
   if (Notification.permission !== 'granted') return
-  try {
-    new Notification(title, {
-      body: body.slice(0, 100),
-      icon: '/favicon.ico',
-      tag: 'walaup-msg',
-      renotify: true,
-    })
-  } catch (e) {}
+  try { new Notification(title, { body: body.slice(0, 100), icon: '/favicon.ico', tag: 'walaup-msg', renotify: true }) } catch (e) {}
 }
 
 const CSS = `
@@ -126,35 +116,37 @@ export default function TabMessages({ lead, session }) {
     endRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' })
   }, [])
 
-  useEffect(() => {
-    if (!lead?.id) { setLoading(false); return }
-
-    // Demander permission push notifications
-    requestNotifPermission()
-
-    // Chargement initial
-    supabase
+  // ── Fetch messages (réutilisable) ──────────────────────────────────────────
+  const fetchMessages = useCallback(async () => {
+    if (!lead?.id) return
+    const { data, error } = await supabase
       .from('messages')
       .select('id, sender, text, is_read, created_at')
       .eq('lead_id', lead.id)
       .order('created_at', { ascending: true })
-      .then(({ data, error }) => {
-        if (!error && data) setMessages(data)
-        setLoading(false)
-        setTimeout(() => scrollToEnd(false), 80)
-      })
-
+    if (!error && data) {
+      setMessages(data)
+      setTimeout(() => scrollToEnd(false), 80)
+    }
     // Marquer les messages admin comme lus
-    supabase.from('messages').update({ is_read: true }).eq('lead_id', lead.id).eq('sender', 'admin').then(() => {})
+    await supabase.from('messages').update({ is_read: true }).eq('lead_id', lead.id).eq('sender', 'admin')
+  }, [lead?.id, scrollToEnd])
 
-    // Realtime: nouveaux messages — PAS de filter= pour éviter le problème REPLICA IDENTITY
+  // ── Init + subscriptions ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!lead?.id) { setLoading(false); return }
+
+    requestNotifPermission()
+
+    fetchMessages().then(() => setLoading(false))
+
+    // Realtime: nouveaux messages (filtre côté client pour éviter REPLICA IDENTITY)
     msgChannelRef.current = supabase
-      .channel(`cl-msgs-${lead.id}`)
+      .channel(`cl-msgs-${lead.id}-${Date.now()}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
         ({ new: msg }) => {
-          // Filtrer côté client
           if (msg.lead_id !== lead.id) return
           setMessages(prev => {
             if (prev.find(m => m.id === msg.id)) return prev
@@ -171,13 +163,14 @@ export default function TabMessages({ lead, session }) {
       )
       .subscribe()
 
-    // Realtime: indicateur de frappe admin — sans filter=
+    // Realtime: typing admin
     typingChannelRef.current = supabase
-      .channel(`cl-typing-${lead.id}`)
+      .channel(`cl-typing-${lead.id}-${Date.now()}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'leads' },
-        ({ new: data }) => { if (data.id !== lead.id) return
+        ({ new: data }) => {
+          if (data.id !== lead.id) return
           setAdminTyping(!!data.admin_typing)
           if (data.admin_typing) setTimeout(() => scrollToEnd(true), 50)
         }
@@ -190,7 +183,18 @@ export default function TabMessages({ lead, session }) {
       clearTimeout(typingTimer.current)
       supabase.from('leads').update({ client_typing: false }).eq('id', lead.id).then(() => {})
     }
-  }, [lead?.id, scrollToEnd])
+  }, [lead?.id, fetchMessages, scrollToEnd])
+
+  // ── FIX : visibilitychange → refetch quand l'onglet redevient actif ───────
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && lead?.id) {
+        fetchMessages()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [lead?.id, fetchMessages])
 
   useEffect(() => {
     if (!loading) setTimeout(() => scrollToEnd(true), 60)
@@ -218,7 +222,7 @@ export default function TabMessages({ lead, session }) {
     clearTimeout(typingTimer.current)
     supabase.from('leads').update({ client_typing: false }).eq('id', lead.id).then(() => {})
 
-    // ✅ Update optimiste — message visible immédiatement
+    // Optimistic update
     const tempMsg = {
       id: `temp-${Date.now()}`,
       sender: 'client',
@@ -231,12 +235,7 @@ export default function TabMessages({ lead, session }) {
     setTimeout(() => scrollToEnd(true), 30)
 
     try {
-      await supabase.from('messages').insert({
-        lead_id: lead.id,
-        sender: 'client',
-        text: t,
-        is_read: false,
-      })
+      await supabase.from('messages').insert({ lead_id: lead.id, sender: 'client', text: t, is_read: false })
     } catch (err) {
       console.error('[TabMessages] send failed', err)
     } finally {
@@ -248,9 +247,9 @@ export default function TabMessages({ lead, session }) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() }
   }
 
-const sIconLg  = { fontSize: 32 }
-const sTextSm  = { fontSize: 13 }
-const sTitleH2 = { fontFamily: "'Space Grotesk',sans-serif", fontWeight: 800, fontSize: 18, color: 'var(--tx)', marginBottom: 16 }
+  const sIconLg  = { fontSize: 32 }
+  const sTextSm  = { fontSize: 13 }
+  const sTitleH2 = { fontFamily: "'Space Grotesk',sans-serif", fontWeight: 800, fontSize: 18, color: 'var(--tx)', marginBottom: 16 }
 
   if (!lead) {
     return (
@@ -273,9 +272,7 @@ const sTitleH2 = { fontFamily: "'Space Grotesk',sans-serif", fontWeight: 800, fo
         <h2 style={sTitleH2}>Messages</h2>
 
         <div className="tm-msgs">
-          {loading && (
-            <div className="tm-center"><div className="tm-spin" /></div>
-          )}
+          {loading && <div className="tm-center"><div className="tm-spin" /></div>}
           {!loading && messages.length === 0 && (
             <div className="tm-center">
               <span style={sIconLg}>✉️</span>
