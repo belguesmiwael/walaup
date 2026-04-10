@@ -316,6 +316,7 @@ export default function Home() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
+    window.dispatchEvent(new CustomEvent('walaup:route-change'))
   }, [])
 
   const scrollToContact = () => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })
