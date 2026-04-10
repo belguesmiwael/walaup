@@ -39,8 +39,7 @@ function pushNotif(title, body) {
 }
 
 const CSS = `
-  .tm-root { display: flex; flex-direction: column; height: calc(100vh - 64px - 116px); }
-  @media (max-width: 767px) { .tm-root { height: calc(100vh - 64px - 64px - 80px); } }
+  .tm-root { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
 
   .tm-msgs {
     flex: 1; overflow-y: auto; display: flex; flex-direction: column;
@@ -148,27 +147,23 @@ export default function TabMessages({ lead, session }) {
     // Marquer les messages admin comme lus
     supabase.from('messages').update({ is_read: true }).eq('lead_id', lead.id).eq('sender', 'admin').then(() => {})
 
-    // Realtime: nouveaux messages
+    // Realtime: nouveaux messages — PAS de filter= pour éviter le problème REPLICA IDENTITY
     msgChannelRef.current = supabase
       .channel(`cl-msgs-${lead.id}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `lead_id=eq.${lead.id}` },
+        { event: 'INSERT', schema: 'public', table: 'messages' },
         ({ new: msg }) => {
+          // Filtrer côté client
+          if (msg.lead_id !== lead.id) return
           setMessages(prev => {
-            // Éviter les doublons
             if (prev.find(m => m.id === msg.id)) return prev
-            // Remplacer le message temp si c'est le message client qu'on vient d'envoyer
             const withoutTemp = prev.filter(m => !(m._temp && m.sender === msg.sender && m.text === msg.text))
             return [...withoutTemp, msg]
           })
           if (msg.sender === 'admin') {
             WalaupSound.receive()
-            // Notification push si page pas en focus
-            if (document.hidden) {
-              pushNotif('💬 Nouveau message Walaup', msg.text)
-            }
-            // Marquer comme lu immédiatement
+            if (document.hidden) pushNotif('💬 Nouveau message Walaup', msg.text)
             supabase.from('messages').update({ is_read: true }).eq('id', msg.id).then(() => {})
           }
           setTimeout(() => scrollToEnd(true), 50)
@@ -176,13 +171,13 @@ export default function TabMessages({ lead, session }) {
       )
       .subscribe()
 
-    // Realtime: indicateur de frappe admin
+    // Realtime: indicateur de frappe admin — sans filter=
     typingChannelRef.current = supabase
       .channel(`cl-typing-${lead.id}`)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'leads', filter: `id=eq.${lead.id}` },
-        ({ new: data }) => {
+        { event: 'UPDATE', schema: 'public', table: 'leads' },
+        ({ new: data }) => { if (data.id !== lead.id) return
           setAdminTyping(!!data.admin_typing)
           if (data.admin_typing) setTimeout(() => scrollToEnd(true), 50)
         }
