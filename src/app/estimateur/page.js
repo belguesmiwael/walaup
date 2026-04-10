@@ -185,15 +185,16 @@ function StepIndicator({ current }) {
     }
   })
 
-  return (
-    <>
-      <style>{waveCss}</style>
-      <div style= display: 'flex', alignItems: 'flex-start', width: '100%' >
-        {items}
-      </div>
-    </>
-  )
-}
+  const sWrap = { display: 'flex', alignItems: 'flex-start', width: '100%' }
+
+return (
+  <>
+    <style>{waveCss}</style>
+    <div style={sWrap}>
+      {items}
+    </div>
+  </>
+)
 
 // ─── Price Sidebar ────────────────────────────────────────────────────────────
 
