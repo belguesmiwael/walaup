@@ -217,6 +217,10 @@ export default function AdminPage() {
   const [loginForm,    setLoginForm]    = useState({ email: '', password: '' })
   const [loginErr,     setLoginErr]     = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
+  const [unreadCount,  setUnreadCount]  = useState(0)   
+  const [pendingCount, setPendingCount] = useState(0)   
+  const leadsRtRef = useRef(null)                       
+  const msgsRtRef  = useRef(null) 
 
   /* ── Masquer navbar / footer globaux ── */
   useEffect(() => {
@@ -229,7 +233,7 @@ export default function AdminPage() {
     return () => toHide.forEach(el => el.style.removeProperty('display'))
   }, [])
 
-  /* ── Vérifier la session existante ── */
+/* ── Vérifier la session existante ── */
   useEffect(() => {
     const check = async () => {
       try {
@@ -246,7 +250,61 @@ if (userData?.role === 'super_admin') setAuthed(true)
       setLoading(false)
     }
     check()
-  }, [])
+  }, [])   // ← FIN DU USEEFFECT EXISTANT
+
+  /* ── Realtime badges admin — se lance seulement après auth ── */  // ← COLLE ICI
+  useEffect(() => {
+    if (!authed) return
+
+    const fetchCounts = async () => {
+      const { count: pending } = await supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'new')
+      if (pending != null) setPendingCount(pending)
+
+      const { count: unread } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('sender', 'client')
+        .eq('is_read', false)
+      if (unread != null) setUnreadCount(unread)
+    }
+    fetchCounts()
+
+    if (leadsRtRef.current) supabase.removeChannel(leadsRtRef.current)
+    leadsRtRef.current = supabase
+      .channel('admin-leads-rt')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'leads' }, () => {
+        setPendingCount(c => c + 1)
+        WalaupSound.notif()
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'leads' }, ({ new: lead }) => {
+        if (lead.status !== 'new') setPendingCount(c => Math.max(0, c - 1))
+      })
+      .subscribe()
+
+    if (msgsRtRef.current) supabase.removeChannel(msgsRtRef.current)
+    msgsRtRef.current = supabase
+      .channel('admin-msgs-rt')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, ({ new: msg }) => {
+        if (msg.sender === 'client') {
+          setUnreadCount(c => c + 1)
+          WalaupSound.receive()
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, ({ new: msg }) => {
+        if (msg.is_read && msg.sender === 'client') {
+          setUnreadCount(c => Math.max(0, c - 1))
+        }
+      })
+      .subscribe()
+
+    return () => {
+      if (leadsRtRef.current) supabase.removeChannel(leadsRtRef.current)
+      if (msgsRtRef.current) supabase.removeChannel(msgsRtRef.current)
+    }
+  }, [authed])
 
   /* ── Login ── */
   const handleLogin = async (e) => {
@@ -370,12 +428,12 @@ if (userData?.role !== 'super_admin') {
 
               {/* Sidebar — visible desktop uniquement via CSS */}
               <div className="adm-sidebar-wrap">
-                <AdminSidebar
-                  active={tab}
-                  onTab={setTab}
-                  unreadCount={0}
-                  pendingCount={0}
-                  onLogout={handleLogout}
+               <AdminSidebar
+                 active={tab}
+                 onTab={setTab}
+                 unreadCount={unreadCount}
+                 pendingCount={pendingCount}
+                 onLogout={handleLogout}
                 />
               </div>
 
