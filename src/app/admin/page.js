@@ -1,6 +1,6 @@
 'use client'
 import { LayoutDashboard, Users, ShoppingBag, CreditCard, Settings } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import AdminSidebar    from '@/components/admin/AdminSidebar'
