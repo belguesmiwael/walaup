@@ -372,6 +372,21 @@ export default function ClientPage() {
   const [unreadMsg, setUnreadMsg] = useState(0)
   const [loading, setLoading] = useState(true)
 
+  // ── Fullscreen — cache navbar + footer du layout global ─────────────────────────────
+  useEffect(() => {
+    const toHide = [
+      ...document.querySelectorAll('nav'),
+      ...document.querySelectorAll('header'),
+      ...document.querySelectorAll('footer'),
+    ]
+    toHide.forEach(el => el.style.setProperty('display', 'none', 'important'))
+    document.body.style.overflow = 'hidden'
+    return () => {
+      toHide.forEach(el => el.style.removeProperty('display'))
+      document.body.style.overflow = ''
+    }
+  }, [])
+
   // ── Auth + lead ──────────────────────────────────────────────────────────────────────
 const loadLead = useCallback(async (userId) => {
     const { data } = await supabase.from('leads').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
