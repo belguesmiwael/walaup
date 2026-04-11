@@ -283,25 +283,21 @@ function DemoPanel({ lead, onRefresh }) {
     if (lead.pay_amount) setPayAmount(String(lead.pay_amount))
   }, [lead.note, lead.status, lead.pay_method, lead.pay_amount])
 
-  // ✅ REALTIME : détecte instantanément les changements client (modification demandée, validation...)
+  // ✅ REALTIME : détecte instantanément les changements client — sans filtre DB (plus fiable)
   useEffect(() => {
     if (!lead?.id) return
     const channel = supabase
       .channel(`demo-panel-${lead.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'leads', filter: `id=eq.${lead.id}` },
-        (payload) => {
-          if (!payload.new) return
-          const m = parseDemoMeta(payload.new.note)
-          setMetaState(m)
-          const u = {}; m.demos.forEach(d => { u[d.slot] = d.url || '' })
-          setDemoUrls(u)
-          setFinalUrl(m.finalUrl || '')
-          if (payload.new.pay_amount) setPayAmount(String(payload.new.pay_amount))
-          if (onRefresh) onRefresh()
-        }
-      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'leads' }, (payload) => {
+        if (!payload.new || payload.new.id !== lead.id) return  // filtre côté client
+        const m = parseDemoMeta(payload.new.note)
+        setMetaState(m)
+        const u = {}; m.demos.forEach(d => { u[d.slot] = d.url || '' })
+        setDemoUrls(u)
+        setFinalUrl(m.finalUrl || '')
+        if (payload.new.pay_amount) setPayAmount(String(payload.new.pay_amount))
+        if (onRefresh) onRefresh()
+      })
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [lead?.id])
@@ -363,8 +359,15 @@ function DemoPanel({ lead, onRefresh }) {
     const m = deepClone(meta)
     m.demos = m.demos.map(d => ({ ...d, status: 'disabled' }))
     m.finalUrl = url
-    await persist(m)
-    await supabase.from('leads').update({ status: 'delivered', pay_ref: url }).eq('id', lead.id)
+    m.payStatus = 'delivered'  // ✅ marque la livraison dans le meta
+    // ✅ Mise à jour ATOMIQUE (1 seule requête) — évite la race condition entre 2 updates séparés
+    const { error } = await supabase.from('leads').update({
+      note: encodeDemoMeta(m),
+      status: 'delivered',
+      pay_ref: url,
+    }).eq('id', lead.id)
+    if (error) { alert('Erreur livraison : ' + error.message); setSaving(false); return }
+    setMetaState(m)  // mise à jour locale immédiate
     await supabase.from('messages').insert({
       lead_id: lead.id, sender: 'admin',
       text: `🎉 Félicitations ! Votre application est prête et déployée : ${url}`
