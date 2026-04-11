@@ -63,7 +63,6 @@ const CSS = `
   .cl-sidebar--open   { width: 240px; }
   .cl-sidebar--closed { width: 60px; }
 
-  /* Sidebar header (logo + toggle) */
   .cl-sb-header {
     display: flex;
     align-items: center;
@@ -90,7 +89,6 @@ const CSS = `
   }
   .cl-sidebar--open .cl-sidebar-logo { opacity: 1; max-width: 160px; }
 
-  /* Toggle always visible */
   .cl-sb-toggle {
     width: 32px; height: 32px; min-width: 32px;
     display: flex; align-items: center; justify-content: center;
@@ -106,7 +104,6 @@ const CSS = `
   .cl-sb-toggle:hover { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.5); }
   .cl-sidebar--closed .cl-sb-toggle { margin-left: 0; }
 
-  /* Nav scroll area */
   .cl-sb-nav {
     flex: 1;
     padding: 10px 0;
@@ -175,7 +172,6 @@ const CSS = `
   }
   .cl-sidebar--closed .cl-nav-item:hover .cl-nav-tooltip { opacity: 1; }
 
-  /* Sidebar footer */
   .cl-sidebar-footer {
     padding: 8px;
     border-top: 1px solid rgba(255,255,255,0.06);
@@ -184,7 +180,6 @@ const CSS = `
     flex-direction: column;
     gap: 2px;
   }
-  /* User block */
   .cl-user-block {
     padding: 10px;
     margin-bottom: 4px;
@@ -204,7 +199,6 @@ const CSS = `
     background: rgba(99,102,241,0.15); color: var(--ac);
     text-transform: capitalize;
   }
-  /* Footer buttons */
   .cl-sb-footer-btn {
     display: flex; align-items: center; gap: 9px;
     padding: 0 12px; height: 38px;
@@ -228,7 +222,6 @@ const CSS = `
   .cl-sb-footer-btn--logout { color: var(--tx-3); }
   .cl-sb-footer-btn--logout:hover { background: rgba(248,113,113,.09); color: var(--red); }
 
-  /* ── Body (sidebar + content) ── */
   .cl-body {
     flex: 1;
     display: flex;
@@ -236,7 +229,6 @@ const CSS = `
     min-height: 0;
   }
 
-  /* ── Content area ── */
   .cl-content {
     flex: 1;
     overflow-y: auto;
@@ -254,7 +246,6 @@ const CSS = `
     overflow: hidden;
   }
 
-  /* ── FAB nouvelle app (tab Projet uniquement) ── */
   .cl-newapp-fab {
     position: fixed; bottom: 28px; right: 28px;
     display: flex; align-items: center; gap: 8px;
@@ -268,7 +259,6 @@ const CSS = `
   }
   .cl-newapp-fab:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(99,102,241,.55); }
 
-  /* ── Mobile bottom nav ── */
   .cl-bottom-nav {
     display: none;
     flex-shrink: 0;
@@ -281,7 +271,6 @@ const CSS = `
     background: rgba(8,11,20,0.97);
     backdrop-filter: blur(20px);
   }
-  /* Util buttons (retour + logout) */
   .cl-bottom-util {
     width: 46px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
@@ -294,7 +283,6 @@ const CSS = `
   .cl-bottom-util--back:hover { color: var(--tx-2); background: rgba(255,255,255,.04); }
   .cl-bottom-util--logout { color: var(--tx-3); border-left: 1px solid rgba(255,255,255,.06); }
   .cl-bottom-util--logout:hover { color: var(--red); background: rgba(248,113,113,.07); }
-  /* Tab buttons */
   .cl-bottom-tabs { flex: 1; display: flex; }
   .cl-bottom-tab {
     flex: 1;
@@ -329,7 +317,6 @@ const CSS = `
     padding: 0 3px;
   }
 
-  /* ── Mobile drawer overlay ── */
   .cl-drawer-ov {
     position: fixed; inset: 0;
     background: rgba(0,0,0,0.6);
@@ -346,7 +333,6 @@ const CSS = `
     display: flex; flex-direction: column;
   }
 
-  /* ── Responsive ── */
   @media (max-width: 768px) {
     .cl-topbar     { display: flex; }
     .cl-sidebar    { display: none !important; }
@@ -367,15 +353,16 @@ const TABS = [
 
 export default function ClientPage() {
   const router = useRouter()
-  const [session, setSession] = useState(null)
-  const [lead, setLead] = useState(null)
-  const [activeTab, setActiveTab] = useState('projet')
+  const [session, setSession]       = useState(null)
+  const [lead, setLead]             = useState(null)
+  const [leads, setLeads]           = useState([])   // ✅ tous les projets du client
+  const [activeTab, setActiveTab]   = useState('projet')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [unreadMsg, setUnreadMsg] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const [unreadMsg, setUnreadMsg]   = useState(0)
+  const [loading, setLoading]       = useState(true)
 
-  // ── Fullscreen — cache navbar + footer du layout global ─────────────────────────────
+  // ── Fullscreen — cache navbar + footer du layout global
   useEffect(() => {
     const toHide = [
       ...document.querySelectorAll('nav'),
@@ -390,34 +377,69 @@ export default function ClientPage() {
     }
   }, [])
 
-  // ── Auth + lead ──────────────────────────────────────────────────────────────────────
-const loadLead = useCallback(async (userId) => {
-    const { data } = await supabase.from('leads').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-    if (!data) {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user?.email) {
-        const { data: byEmail } = await supabase.from('leads').select('*').ilike('email', user.email).order('created_at', { ascending: false }).limit(1).maybeSingle()
-        if (byEmail) setLead(byEmail)
+  // ── Charge TOUS les leads du client (multi-projets) ✅
+  const loadLeads = useCallback(async (userId) => {
+    // 1. Cherche par user_id
+    const { data: byUserId } = await supabase
+      .from('leads')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (byUserId && byUserId.length > 0) {
+      setLeads(byUserId)
+      setLead(byUserId[0])
+      return
+    }
+
+    // 2. Fallback par email
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user?.email) {
+      const { data: byEmail } = await supabase
+        .from('leads')
+        .select('*')
+        .ilike('email', user.email)
+        .order('created_at', { ascending: false })
+      if (byEmail && byEmail.length > 0) {
+        setLeads(byEmail)
+        setLead(byEmail[0])
       }
-    } else {
-      setLead(data)
     }
   }, [])
 
+  // ── Auth
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       if (!session) { router.push('/login'); return }
-      loadLead(session.user.id).finally(() => setLoading(false))
+      loadLeads(session.user.id).finally(() => setLoading(false))
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
       setSession(s)
       if (!s) router.push('/login')
     })
     return () => subscription.unsubscribe()
-  }, [router, loadLead])
+  }, [router, loadLeads])
 
-  // ── Unread messages (polling 10s) ─────────────────────────────────────────────────
+  // ── Realtime : met à jour le lead actif instantanément quand admin le change ✅
+  useEffect(() => {
+    if (!lead?.id) return
+    const channel = supabase
+      .channel(`client-lead-${lead.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'leads', filter: `id=eq.${lead.id}` },
+        (payload) => {
+          if (!payload.new) return
+          setLead(payload.new)
+          setLeads(prev => prev.map(l => l.id === payload.new.id ? payload.new : l))
+        }
+      )
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [lead?.id])
+
+  // ── Unread messages (polling 10s)
   useEffect(() => {
     if (!lead?.id || activeTab === 'messages') return
     const check = async () => {
@@ -440,9 +462,15 @@ const loadLead = useCallback(async (userId) => {
     if (id === 'messages') setUnreadMsg(0)
   }
 
+  // ── Handler setLead qui synchronise aussi le tableau leads ✅
+  const handleSetLead = (updatedLead) => {
+    setLead(updatedLead)
+    setLeads(prev => prev.map(l => l.id === updatedLead.id ? updatedLead : l))
+  }
+
   const sbCls = sidebarOpen ? 'cl-sidebar cl-sidebar--open' : 'cl-sidebar cl-sidebar--closed'
 
-  const sLoadWrap  = { height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-base)' }
+  const sLoadWrap    = { height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-base)' }
   const sLoadSpinner = { width: 32, height: 32, border: '2px solid rgba(99,102,241,.2)', borderTopColor: 'var(--ac)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }
 
   if (loading) {
@@ -461,7 +489,6 @@ const loadLead = useCallback(async (userId) => {
   const sDrawerBack   = { display: 'flex', alignItems: 'center', gap: 9, padding: '9px 14px', borderRadius: 10, color: 'var(--tx-3)', textDecoration: 'none', fontSize: 12, fontWeight: 600, fontFamily: 'Inter, sans-serif' }
   const sDrawerLogout = { display: 'flex', alignItems: 'center', gap: 9, padding: '9px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.15)', color: '#F87171', cursor: 'pointer', fontSize: 12, fontWeight: 600, width: '100%', fontFamily: 'Inter, sans-serif' }
 
-  // Nav items réutilisables (sidebar + drawer)
   const NavItems = ({ inDrawer = false }) => (
     <>
       {TABS.map(tab => {
@@ -475,7 +502,7 @@ const loadLead = useCallback(async (userId) => {
             onClick={() => switchTab(tab.id)}>
             <Icon size={17} />
             {inDrawer
-              ? tab.id === 'messages' ? 'Messages' : tab.label  // toujours visible dans drawer
+              ? tab.label
               : <span className="cl-nav-label">{tab.label}</span>
             }
             {badge > 0 && (
@@ -495,7 +522,7 @@ const loadLead = useCallback(async (userId) => {
       <style>{CSS}</style>
       <div className="cl-root">
 
-        {/* ── Mobile topbar — logo uniquement ── */}
+        {/* ── Mobile topbar ── */}
         <div className="cl-topbar">
           <span className="cl-topbar-logo">Walaup</span>
         </div>
@@ -560,22 +587,27 @@ const loadLead = useCallback(async (userId) => {
 
           {/* Content */}
           <main className={`cl-content${activeTab === 'messages' ? ' cl-content--messages' : ''}`}>
-            {activeTab === 'projet'     && <TabProjet     lead={lead} session={session} setLead={setLead} />}
+            {activeTab === 'projet' && (
+              <TabProjet
+                lead={lead}
+                leads={leads}
+                session={session}
+                setLead={handleSetLead}
+              />
+            )}
             {activeTab === 'messages'   && <TabMessages   lead={lead} session={session} isActive={activeTab === 'messages'} onUnreadChange={setUnreadMsg} />}
             {activeTab === 'paiements'  && <TabPaiements  lead={lead} />}
             {activeTab === 'apps'       && <TabApps       lead={lead} />}
-            {activeTab === 'abonnement' && <TabAbonnement lead={lead} setLead={setLead} />}
+            {activeTab === 'abonnement' && <TabAbonnement lead={lead} setLead={handleSetLead} />}
           </main>
         </div>
 
         {/* ── Mobile bottom nav ── */}
         <nav className="cl-bottom-nav">
           <div className="cl-bottom-nav-inner">
-            {/* Retour accueil */}
             <a href="/" className="cl-bottom-util cl-bottom-util--back" aria-label="Accueil">
               <ArrowLeft size={18} />
             </a>
-            {/* 5 tabs */}
             <div className="cl-bottom-tabs">
               {TABS.map(tab => {
                 const Icon = tab.icon
@@ -593,14 +625,13 @@ const loadLead = useCallback(async (userId) => {
                 )
               })}
             </div>
-            {/* Déconnecter */}
             <button className="cl-bottom-util cl-bottom-util--logout" aria-label="Déconnecter" onClick={logout}>
               <LogOut size={17} />
             </button>
           </div>
         </nav>
 
-        {/* FAB nouvelle app — tab Projet uniquement */}
+        {/* FAB nouvelle app */}
         {activeTab === 'projet' && (
           <Link href="/estimateur" className="cl-newapp-fab">
             <PlusCircle size={15} /> Nouvelle app
