@@ -364,7 +364,7 @@ function DemoPanel({ lead, onRefresh }) {
     // ✅ Mise à jour ATOMIQUE — 1 seule requête
     const { data: updatedRows, error } = await supabase
       .from('leads')
-      .update({ note: encodeDemoMeta(m), status: 'delivered', pay_ref: url })
+      .update({ note: encodeDemoMeta(m), status: 'delivered' })
       .eq('id', lead.id)
       .select()  // ✅ retourne les lignes mises à jour pour confirmer
 
