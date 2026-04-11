@@ -345,6 +345,11 @@ function DemoPanel({ lead, onRefresh }) {
       pay_method: payMethod,
       pay_amount: parseFloat(payAmount) || 0,
     }).eq('id', lead.id)
+    // ✅ Marquer le paiement comme "complété" dans la table payments
+    await supabase.from('payments')
+      .update({ status: 'completed' })
+      .eq('lead_id', lead.id)
+      .eq('status', 'pending')
     await supabase.from('messages').insert({
       lead_id: lead.id, sender: 'admin',
       text: '✅ Paiement confirmé ! Votre application est en cours de développement final. Merci pour votre confiance.'
