@@ -16,7 +16,10 @@ import { TabAbonnement, TabPaiements, TabApps } from '@/components/client/tabs'
 const CSS = `
   /* ── Root layout ── */
   .cl-root {
-    height: 100dvh;
+    position: fixed;
+    top: 0; left: 0;
+    right: 0; bottom: 0;
+    z-index: 1000;
     display: flex;
     flex-direction: column;
     background: var(--bg-base);
