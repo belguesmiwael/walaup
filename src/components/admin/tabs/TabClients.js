@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   Search, Send, CheckCheck, X, Eye, Smartphone, Monitor,
   CheckCircle2, CreditCard, Rocket, ArrowLeft, User,
@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
-// ─── Demo meta helpers ────────────────────────────────────────────────────────
+// ─── Demo meta helpers ─────────────────────────────────────────────────────────────
 function deepClone(obj) { return JSON.parse(JSON.stringify(obj)) }
 
 const DEMO_DEFAULT = {
@@ -43,7 +43,7 @@ function encodeDemoMeta(meta) {
   return 'walaup_demos:' + JSON.stringify(meta)
 }
 
-// ─── Config ───────────────────────────────────────────────────────────────────
+// ─── Config ─────────────────────────────────────────────────────────────────────────
 const STATUS_CONFIG = {
   new:               { label: 'Nouveau',           color: '#22D3EE', bg: 'rgba(34,211,238,0.1)'  },
   demo:              { label: 'Démo prête',        color: '#6366F1', bg: 'rgba(99,102,241,0.1)'  },
@@ -78,7 +78,6 @@ const CSS = `
   /* LIST */
   .tc-list { flex:1; display:flex; flex-direction:column; overflow:hidden; }
   .tc-list-head { padding:14px 16px; border-bottom:1px solid rgba(255,255,255,0.07); display:flex; align-items:center; gap:10px; flex-shrink:0; }
-  .tc-list-title { font-family:'Space Grotesk',sans-serif; font-weight:800; font-size:18px; color:var(--tx); }
   .tc-list-search { flex:1; position:relative; }
   .tc-sinp { width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.09); border-radius:10px; padding:8px 10px 8px 34px; color:var(--tx); font-size:12px; outline:none; box-sizing:border-box; }
   .tc-sinp:focus { border-color:rgba(99,102,241,0.4); }
@@ -91,8 +90,9 @@ const CSS = `
   .tc-avatar { width:40px; height:40px; border-radius:50%; flex-shrink:0; background:linear-gradient(135deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; color:#fff; font-family:'Space Grotesk',sans-serif; }
   .tc-avatar--sm { width:32px; height:32px; font-size:12px; }
   .tc-lead-info { flex:1; min-width:0; }
-  .tc-lead-name { font-weight:700; font-size:13px; color:var(--tx); margin-bottom:2px; }
+  .tc-lead-name { font-weight:700; font-size:13px; color:var(--tx); margin-bottom:2px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .tc-lead-meta { font-size:11px; color:var(--tx-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tc-multi-badge { padding:1px 7px; border-radius:20px; font-size:9px; font-weight:700; background:rgba(99,102,241,0.15); color:var(--ac); flex-shrink:0; }
   .tc-lead-right { display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex-shrink:0; }
   .tc-badge { padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; }
   .tc-unread-dot { width:17px; height:17px; border-radius:9px; background:var(--red); font-size:9px; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; }
@@ -100,10 +100,15 @@ const CSS = `
 
   /* DETAIL */
   .tc-detail { flex:1; display:flex; flex-direction:column; overflow:hidden; }
-  .tc-detail-head { padding:12px 16px; border-bottom:1px solid rgba(255,255,255,0.07); display:flex; align-items:center; gap:10px; flex-shrink:0; background:rgba(10,14,28,0.7); backdrop-filter:blur(12px); }
-  .tc-back-btn { display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:9px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:var(--tx-2); font-size:12px; font-weight:600; cursor:pointer; transition:all 160ms; font-family:'Inter',sans-serif; flex-shrink:0; }
+  .tc-detail-head { padding:12px 16px; border-bottom:1px solid rgba(255,255,255,0.07); display:flex; align-items:flex-start; gap:10px; flex-shrink:0; background:rgba(10,14,28,0.7); backdrop-filter:blur(12px); }
+  .tc-back-btn { display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:9px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:var(--tx-2); font-size:12px; font-weight:600; cursor:pointer; transition:all 160ms; font-family:'Inter',sans-serif; flex-shrink:0; margin-top:2px; }
   .tc-back-btn:hover { background:rgba(255,255,255,0.09); color:var(--tx); }
-  .tc-detail-name { font-weight:700; font-size:14px; color:var(--tx); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tc-detail-info { flex:1; min-width:0; }
+  .tc-detail-name { font-weight:700; font-size:14px; color:var(--tx); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tc-app-switcher { display:flex; gap:4px; flex-wrap:wrap; margin-top:6px; }
+  .tc-app-btn { padding:2px 9px; border-radius:20px; font-size:10px; font-weight:600; cursor:pointer; border:1px solid; font-family:'Inter',sans-serif; transition:all .15s; white-space:nowrap; }
+  .tc-app-btn--active { background:rgba(99,102,241,0.18); border-color:rgba(99,102,241,0.5); color:var(--ac); }
+  .tc-app-btn--idle { background:rgba(255,255,255,0.03); border-color:rgba(255,255,255,0.1); color:var(--tx-3); }
   .tc-tab-btns { display:flex; gap:5px; flex-shrink:0; }
   .tc-tab-btn { padding:7px 14px; border-radius:9px; font-size:12px; font-weight:600; cursor:pointer; border:1px solid transparent; transition:all 160ms; background:transparent; color:var(--tx-3); font-family:'Inter',sans-serif; display:flex; align-items:center; gap:5px; }
   .tc-tab-btn--active { background:rgba(99,102,241,0.15); border-color:rgba(99,102,241,0.35); color:var(--ac); }
@@ -140,7 +145,6 @@ const CSS = `
   .tc-demo-btn--send { background:linear-gradient(135deg,#6366F1,#8B5CF6); color:#fff; }
   .tc-demo-btn--preview { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:var(--tx-2); }
   .tc-demo-btn--disable { background:rgba(248,113,113,0.09); border:1px solid rgba(248,113,113,0.18); color:#F87171; }
-
   .tc-pay-box { border:1px solid rgba(245,158,11,0.2); border-radius:11px; padding:13px; background:rgba(245,158,11,0.04); margin-top:9px; }
   .tc-pay-title { font-size:11px; font-weight:700; color:var(--gold); margin-bottom:9px; display:flex; align-items:center; gap:6px; }
   .tc-pay-methods { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:8px; }
@@ -150,7 +154,6 @@ const CSS = `
   .tc-pay-btn--gold { background:linear-gradient(135deg,#F59E0B,#D97706); color:#000; }
   .tc-pay-btn--green { background:linear-gradient(135deg,#10B981,#059669); color:#fff; }
   .tc-pay-btn:disabled { opacity:.5; cursor:not-allowed; }
-
   .tc-final-box { border:1px solid rgba(16,185,129,0.25); border-radius:11px; padding:13px; background:rgba(16,185,129,0.04); margin-top:9px; }
   .tc-final-title { font-size:11px; font-weight:700; color:#10B981; margin-bottom:9px; display:flex; align-items:center; gap:6px; }
   .tc-final-row { display:flex; gap:7px; }
@@ -191,7 +194,7 @@ const CSS = `
   .tc-browser-url { flex:1; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08); border-radius:5px; padding:3px 10px; font-size:11px; color:var(--tx-3); font-family:'JetBrains Mono',monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 `
 
-// ─── Preview modal ────────────────────────────────────────────────────────────
+// ─── Preview modal ─────────────────────────────────────────────────────────────
 function PreviewModal({ url, onClose }) {
   const [mode, setMode] = useState('browser')
   const screenRef = useRef(null)
@@ -209,10 +212,18 @@ function PreviewModal({ url, onClose }) {
 
   useEffect(() => { if (mode === 'mobile') setTimeout(scaleMobile, 120) }, [mode, scaleMobile])
 
+  const sPreviewBox    = { background: '#0D1120', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 40px 100px rgba(0,0,0,0.8)', width: mode === 'mobile' ? 'auto' : 'min(900px,92vw)', display: 'flex', flexDirection: 'column' }
+  const sPrevMobile    = { display: 'flex', justifyContent: 'center', padding: 20 }
+  const sPrevIframe    = { border: 'none', display: 'block' }
+  const sDotRed        = { background: '#F87171' }
+  const sDotYellow     = { background: '#FBBF24' }
+  const sDotGreen      = { background: '#34D399' }
+  const sBrowserH      = { height: 480 }
+  const sDesktopIframe = { width: '100%', height: '100%', border: 'none', display: 'block' }
+
   return (
     <div className="tc-prev-ov" onClick={onClose}>
-      <div style={{ background: '#0D1120', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 40px 100px rgba(0,0,0,0.8)', width: mode === 'mobile' ? 'auto' : 'min(900px,92vw)', display: 'flex', flexDirection: 'column' }}
-        onClick={e => e.stopPropagation()}>
+      <div style={sPreviewBox} onClick={e => e.stopPropagation()}>
         <div className="tc-prev-head">
           <span className="tc-prev-url">{url}</span>
           <div className="tc-toggle-wrap">
@@ -222,11 +233,11 @@ function PreviewModal({ url, onClose }) {
           <button className="tc-close-btn" onClick={onClose}><X size={13} /></button>
         </div>
         {mode === 'mobile' ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}>
+          <div style={sPrevMobile}>
             <div className="tc-phone-shell">
               <div className="tc-phone-notch" />
               <div className="tc-phone-screen" ref={screenRef}>
-                <iframe ref={iframeRef} src={url} sandbox="allow-scripts allow-forms allow-popups" title="preview" style={{ border: 'none', display: 'block' }} onLoad={scaleMobile} />
+                <iframe ref={iframeRef} src={url} sandbox="allow-scripts allow-forms allow-popups" title="preview" style={sPrevIframe} onLoad={scaleMobile} />
               </div>
             </div>
           </div>
@@ -234,14 +245,14 @@ function PreviewModal({ url, onClose }) {
           <>
             <div className="tc-browser-bar">
               <div className="tc-browser-dots">
-                <div className="tc-browser-dot" style={{ background: '#F87171' }} />
-                <div className="tc-browser-dot" style={{ background: '#FBBF24' }} />
-                <div className="tc-browser-dot" style={{ background: '#34D399' }} />
+                <div className="tc-browser-dot" style={sDotRed} />
+                <div className="tc-browser-dot" style={sDotYellow} />
+                <div className="tc-browser-dot" style={sDotGreen} />
               </div>
               <div className="tc-browser-url">{url}</div>
             </div>
-            <div style={{ height: 480 }}>
-              <iframe src={url} sandbox="allow-scripts allow-forms allow-popups" title="preview desktop" style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} />
+            <div style={sBrowserH}>
+              <iframe src={url} sandbox="allow-scripts allow-forms allow-popups" title="preview desktop" style={sDesktopIframe} />
             </div>
           </>
         )}
@@ -250,7 +261,7 @@ function PreviewModal({ url, onClose }) {
   )
 }
 
-// ─── DemoPanel ────────────────────────────────────────────────────────────────
+// ─── DemoPanel ────────────────────────────────────────────────────────────────────
 function DemoPanel({ lead, onRefresh }) {
   const [meta, setMetaState] = useState(() => parseDemoMeta(lead.note))
   const [demoUrls, setDemoUrls] = useState(() => {
@@ -262,13 +273,38 @@ function DemoPanel({ lead, onRefresh }) {
   const [saving, setSaving] = useState(false)
   const [previewUrl, setPreviewUrl] = useState(null)
 
+  // Sync quand le lead parent change
   useEffect(() => {
     const m = parseDemoMeta(lead.note)
     setMetaState(m)
     const u = {}; m.demos.forEach(d => { u[d.slot] = d.url || '' })
     setDemoUrls(u)
     setFinalUrl(m.finalUrl || '')
+    if (lead.pay_amount) setPayAmount(String(lead.pay_amount))
   }, [lead.note, lead.status, lead.pay_method, lead.pay_amount])
+
+  // ✅ REALTIME : détecte instantanément les changements client (modification demandée, validation...)
+  useEffect(() => {
+    if (!lead?.id) return
+    const channel = supabase
+      .channel(`demo-panel-${lead.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'leads', filter: `id=eq.${lead.id}` },
+        (payload) => {
+          if (!payload.new) return
+          const m = parseDemoMeta(payload.new.note)
+          setMetaState(m)
+          const u = {}; m.demos.forEach(d => { u[d.slot] = d.url || '' })
+          setDemoUrls(u)
+          setFinalUrl(m.finalUrl || '')
+          if (payload.new.pay_amount) setPayAmount(String(payload.new.pay_amount))
+          if (onRefresh) onRefresh()
+        }
+      )
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [lead?.id])
 
   const persist = async (newMeta) => {
     await supabase.from('leads').update({ note: encodeDemoMeta(newMeta) }).eq('id', lead.id)
@@ -340,32 +376,40 @@ function DemoPanel({ lead, onRefresh }) {
   const isDelivered = lead.status === 'delivered'
   const validatedDemo = meta.demos.find(d => d.status === 'validated')
 
+  const sDemoTitle    = { fontSize: 10, fontWeight: 700, color: 'var(--tx-3)', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 11, display: 'flex', alignItems: 'center', gap: 6 }
+  const sDemoUrlText  = { fontSize: 11, color: 'var(--tx-3)', fontFamily: "'JetBrains Mono',monospace", marginBottom: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+  const sPayWaiting   = { fontSize: 11, color: '#FB923C', marginBottom: 8 }
+  const sPayConfirmed = { fontSize: 12, color: '#10B981', display: 'flex', alignItems: 'center', gap: 6 }
+  const sDeliverWarn  = { fontSize: 11, color: 'var(--tx-3)', marginBottom: 8 }
+  const sFinalLink    = { fontSize: 11, color: 'var(--ac)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }
+  const demoBadgeStyle  = (sui) => ({ background: sui.bg, color: sui.color })
+  const payMethodStyle  = (on)  => ({ borderColor: on ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.1)', background: on ? 'rgba(245,158,11,0.1)' : 'transparent', color: on ? 'var(--gold)' : 'var(--tx-2)' })
+
   return (
     <div>
       {previewUrl && <PreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />}
-      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--tx-3)', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={sDemoTitle}>
         <Rocket size={11} color="var(--ac)" /> Démos (3 max) + Livraison finale
       </div>
 
-      {/* Slots démo */}
       {meta.demos.map(demo => {
         const sui = DEMO_STATUS_UI[demo.status] || DEMO_STATUS_UI.locked
-        const isLocked   = demo.status === 'locked'
-        const isPending  = demo.status === 'pending'
-        const isSent     = demo.status === 'sent'
-        const isModReq   = demo.status === 'modify_requested'
-        const isValidated= demo.status === 'validated'
-        const isDisabled = demo.status === 'disabled'
-        const canEdit    = isPending || isModReq
-        const canPreview = (isSent || isValidated || isModReq) && demo.url
-        const canDisable = (isSent || isModReq || isValidated) && !isDisabled
+        const isLocked    = demo.status === 'locked'
+        const isPending   = demo.status === 'pending'
+        const isSent      = demo.status === 'sent'
+        const isModReq    = demo.status === 'modify_requested'
+        const isValidated = demo.status === 'validated'
+        const isDisabled  = demo.status === 'disabled'
+        const canEdit     = isPending || isModReq
+        const canPreview  = (isSent || isValidated || isModReq) && demo.url
+        const canDisable  = (isSent || isModReq || isValidated) && !isDisabled
 
         return (
           <div key={demo.slot}
             className={`tc-demo-slot${isValidated ? ' tc-demo-slot--validated' : ''}${(isLocked || isDisabled) ? ' tc-demo-slot--dim' : ''}`}>
             <div className="tc-demo-head">
               <span className="tc-demo-num">Démo {demo.slot}</span>
-              <span className="tc-demo-badge" style={{ background: sui.bg, color: sui.color }}>{sui.label}</span>
+              <span className="tc-demo-badge" style={demoBadgeStyle(sui)}>{sui.label}</span>
             </div>
 
             {(canEdit || canPreview) && (
@@ -380,7 +424,7 @@ function DemoPanel({ lead, onRefresh }) {
             )}
 
             {(isLocked || isDisabled) && demo.url && (
-              <div style={{ fontSize: 11, color: 'var(--tx-3)', fontFamily: "'JetBrains Mono',monospace", marginBottom: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{demo.url}</div>
+              <div style={sDemoUrlText}>{demo.url}</div>
             )}
 
             <div className="tc-demo-actions">
@@ -404,21 +448,20 @@ function DemoPanel({ lead, onRefresh }) {
         )
       })}
 
-      {/* Section paiement — démo validée */}
       {validatedDemo && !isDelivered && (
         <div className="tc-pay-box">
           <div className="tc-pay-title"><CreditCard size={12} /> Paiement requis</div>
           {(payStatus === 'none' || payStatus === 'requested') ? (
             <>
               {payStatus === 'requested' && (
-                <div style={{ fontSize: 11, color: '#FB923C', marginBottom: 8 }}>⏳ En attente de paiement du client…</div>
+                <div style={sPayWaiting}>⏳ En attente de paiement du client…</div>
               )}
               <div className="tc-pay-methods">
                 {PAYMENT_METHODS.map(pm => {
                   const on = payMethod === pm.id
                   return (
                     <button key={pm.id} className="tc-pay-method"
-                      style={{ borderColor: on ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.1)', background: on ? 'rgba(245,158,11,0.1)' : 'transparent', color: on ? 'var(--gold)' : 'var(--tx-2)' }}
+                      style={payMethodStyle(on)}
                       onClick={() => setPayMethod(pm.id)}>{pm.emoji} {pm.label}</button>
                   )
                 })}
@@ -430,18 +473,17 @@ function DemoPanel({ lead, onRefresh }) {
               </button>
             </>
           ) : (
-            <div style={{ fontSize: 12, color: '#10B981', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={sPayConfirmed}>
               <CheckCircle2 size={13} /> Paiement confirmé — {lead.pay_amount} DT
             </div>
           )}
         </div>
       )}
 
-      {/* Livraison finale */}
       {payStatus === 'confirmed' && !isDelivered && (
         <div className="tc-final-box">
           <div className="tc-final-title"><Rocket size={12} /> Livraison version finale</div>
-          <div style={{ fontSize: 11, color: 'var(--tx-3)', marginBottom: 8 }}>⚠️ Toutes les démos seront désactivées après livraison.</div>
+          <div style={sDeliverWarn}>⚠️ Toutes les démos seront désactivées après livraison.</div>
           <div className="tc-final-row">
             <input className="tc-final-inp" placeholder="https://app.monbusiness.tn/..." value={finalUrl}
               onChange={e => setFinalUrl(e.target.value)} />
@@ -452,13 +494,11 @@ function DemoPanel({ lead, onRefresh }) {
         </div>
       )}
 
-      {/* Livré */}
       {isDelivered && (
         <div className="tc-final-box">
           <div className="tc-final-title"><CheckCircle2 size={12} /> Application livrée ✓</div>
           {meta.finalUrl && (
-            <a href={meta.finalUrl} target="_blank" rel="noreferrer"
-              style={{ fontSize: 11, color: 'var(--ac)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <a href={meta.finalUrl} target="_blank" rel="noreferrer" style={sFinalLink}>
               <Link2 size={11} /> {meta.finalUrl}
             </a>
           )}
@@ -468,26 +508,37 @@ function DemoPanel({ lead, onRefresh }) {
   )
 }
 
-// ─── TabClients ───────────────────────────────────────────────────────────────
+// ─── TabClients ────────────────────────────────────────────────────────────────────
 export default function TabClients() {
-  const [view, setView]           = useState('list')
-  const [detailTab, setDetailTab] = useState('info')
-  const [leads, setLeads]         = useState([])
-  const [selected, setSelected]   = useState(null)
-  const [messages, setMessages]   = useState([])
-  const [search, setSearch]       = useState('')
-  const [msg, setMsg]             = useState('')
-  const [loading, setLoading]     = useState(true)
-  const [sending, setSending]     = useState(false)
+  const [view, setView]             = useState('list')
+  const [detailTab, setDetailTab]   = useState('info')
+  const [leads, setLeads]           = useState([])
+  const [selected, setSelected]     = useState(null)  // groupe client
+  const [selectedApp, setSelectedApp] = useState(null) // ✅ app active dans le groupe
+  const [messages, setMessages]     = useState([])
+  const [search, setSearch]         = useState('')
+  const [msg, setMsg]               = useState('')
+  const [loading, setLoading]       = useState(true)
+  const [sending, setSending]       = useState(false)
   const chatRef    = useRef(null)
   const channelRef = useRef(null)
   const pollRef    = useRef(null)
 
+  // ┅ fetchLeads — met à jour les leads, le groupe sélectionné et l'app active
   const fetchLeads = useCallback(async () => {
     const { data } = await supabase.from('leads').select('*').order('created_at', { ascending: false })
     if (data) {
       setLeads(data)
-      setSelected(prev => prev ? (data.find(l => l.id === prev.id) || prev) : null)
+      // Met à jour le groupe sélectionné
+      setSelected(prev => {
+        if (!prev) return null
+        const key = prev.key
+        const newApps = data.filter(l => (l.email || l.phone || String(l.id)).toLowerCase().trim() === key)
+        if (newApps.length === 0) return prev
+        return { ...prev, apps: newApps }
+      })
+      // ✅ Met à jour l'app active
+      setSelectedApp(prev => prev ? (data.find(l => l.id === prev.id) || prev) : null)
     }
     setLoading(false)
   }, [])
@@ -501,6 +552,7 @@ export default function TabClients() {
     }
   }, [])
 
+  // Init + Realtime global sur tous les leads
   useEffect(() => {
     fetchLeads()
     const ch = supabase.channel('admin-leads-main')
@@ -509,20 +561,19 @@ export default function TabClients() {
     return () => supabase.removeChannel(ch)
   }, [fetchLeads])
 
+  // Messages : polling + Realtime sur l'app active
   useEffect(() => {
-    if (!selected?.id) { setMessages([]); return }
+    if (!selectedApp?.id) { setMessages([]); return }
 
-    fetchMessages(selected.id)
+    fetchMessages(selectedApp.id)
 
-    // POLLING PRIMARY — garantit les messages toutes les 6s
     clearInterval(pollRef.current)
-    pollRef.current = setInterval(() => fetchMessages(selected.id), 6000)
+    pollRef.current = setInterval(() => fetchMessages(selectedApp.id), 6000)
 
-    // REALTIME SECONDARY — instantané si WebSocket actif
     if (channelRef.current) supabase.removeChannel(channelRef.current)
-    channelRef.current = supabase.channel(`admin-chat-${selected.id}-${Date.now()}`)
+    channelRef.current = supabase.channel(`admin-chat-${selectedApp.id}-${Date.now()}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, pl => {
-        if (pl.new.lead_id !== selected.id) return
+        if (pl.new.lead_id !== selectedApp.id) return
         setMessages(prev => {
           if (prev.find(m => m.id === pl.new.id)) return prev
           const clean = prev.filter(m => !(m._temp && m.text === pl.new.text && m.sender === pl.new.sender))
@@ -533,7 +584,7 @@ export default function TabClients() {
       })
       .subscribe()
 
-    const onVisible = () => { if (document.visibilityState === 'visible') fetchMessages(selected.id) }
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchMessages(selectedApp.id) }
     document.addEventListener('visibilitychange', onVisible)
 
     return () => {
@@ -541,10 +592,52 @@ export default function TabClients() {
       if (channelRef.current) supabase.removeChannel(channelRef.current)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [selected?.id, fetchMessages])
+  }, [selectedApp?.id, fetchMessages])
 
-  const openClient = (lead) => {
-    setSelected(lead)
+  // ┅ Grouper les leads par email/phone ┅
+  const groupedClients = useMemo(() => {
+    const map = {}
+    leads.forEach(lead => {
+      const key = (lead.email || lead.phone || String(lead.id)).toLowerCase().trim()
+      if (!map[key]) {
+        map[key] = {
+          key,
+          name: lead.name,
+          phone: lead.phone,
+          email: lead.email,
+          apps: [],
+          latestStatus: lead.status,
+          latestDate: lead.created_at,
+          unreadTotal: 0,
+        }
+      }
+      map[key].apps.push(lead)
+      map[key].unreadTotal += (lead.unread_count || 0)
+      if (new Date(lead.created_at) > new Date(map[key].latestDate)) {
+        map[key].latestStatus = lead.status
+        map[key].latestDate = lead.created_at
+        map[key].name = lead.name
+      }
+    })
+    return Object.values(map).sort((a, b) => new Date(b.latestDate) - new Date(a.latestDate))
+  }, [leads])
+
+  const filteredGroups = useMemo(() => {
+    if (!search.trim()) return groupedClients
+    const q = search.toLowerCase()
+    return groupedClients.filter(g =>
+      (g.name || '').toLowerCase().includes(q) ||
+      (g.phone || '').includes(q) ||
+      (g.email || '').toLowerCase().includes(q) ||
+      g.apps.some(l => (l.type || '').toLowerCase().includes(q))
+    )
+  }, [groupedClients, search])
+
+  // ┅ Navigation ┅
+  const openClient = (group) => {
+    const app = group.apps[0]
+    setSelected(group)
+    setSelectedApp(app)
     setView('detail')
     setDetailTab('info')
     setMessages([])
@@ -552,33 +645,37 @@ export default function TabClients() {
 
   const backToList = () => {
     setView('list')
+    setSelectedApp(null)
     clearInterval(pollRef.current)
     if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null }
   }
 
+  // ┅ Actions ┅
   const sendMsg = async () => {
-    if (!msg.trim() || !selected || sending) return
+    if (!msg.trim() || !selectedApp || sending) return
     setSending(true)
     const text = msg.trim(); setMsg('')
-    const temp = { id: `temp-${Date.now()}`, lead_id: selected.id, sender: 'admin', text, created_at: new Date().toISOString(), _temp: true }
+    const temp = { id: `temp-${Date.now()}`, lead_id: selectedApp.id, sender: 'admin', text, created_at: new Date().toISOString(), _temp: true }
     setMessages(prev => [...prev, temp])
     setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight }, 30)
-    await supabase.from('messages').insert([{ lead_id: selected.id, sender: 'admin', text }])
-    await supabase.from('leads').update({ last_message: text, last_message_at: new Date().toISOString() }).eq('id', selected.id)
+    await supabase.from('messages').insert([{ lead_id: selectedApp.id, sender: 'admin', text }])
+    await supabase.from('leads').update({ last_message: text, last_message_at: new Date().toISOString() }).eq('id', selectedApp.id)
     setSending(false)
   }
 
   const changeStatus = async (s) => {
-    if (!selected) return
-    await supabase.from('leads').update({ status: s }).eq('id', selected.id)
+    if (!selectedApp) return
+    await supabase.from('leads').update({ status: s }).eq('id', selectedApp.id)
     fetchLeads()
   }
 
-  const filtered = leads.filter(l =>
-    (l.name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (l.phone || '').includes(search) ||
-    (l.type || '').toLowerCase().includes(search.toLowerCase())
-  )
+  const sTitleStyle  = { fontFamily: "'Space Grotesk',sans-serif", fontWeight: 800, fontSize: 18, color: 'var(--tx)' }
+  const sRefreshBtn  = { width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'var(--tx-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+  const sLoadingText = { padding: 20, textAlign: 'center', color: 'var(--tx-3)', fontSize: 12 }
+  const sGoldText    = { color: 'var(--gold)' }
+  const sCheckMark   = { marginLeft: 4 }
+  const badgeStyle      = (sc)     => ({ background: sc.bg, color: sc.color })
+  const statusColorStyle = (status) => ({ color: STATUS_CONFIG[status]?.color || 'var(--tx-2)' })
 
   return (
     <>
@@ -589,32 +686,42 @@ export default function TabClients() {
         {view === 'list' && (
           <div className="tc-list">
             <div className="tc-list-head">
-              <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 800, fontSize: 18, color: 'var(--tx)' }}>Clients</span>
+              <span style={sTitleStyle}>Clients</span>
               <div className="tc-list-search">
                 <Search size={13} color="var(--tx-3)" className="tc-sico" />
                 <input className="tc-sinp" placeholder="Rechercher..." value={search} onChange={e => setSearch(e.target.value)} />
               </div>
-              <button onClick={fetchLeads} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'var(--tx-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={fetchLeads} style={sRefreshBtn}>
                 <RefreshCw size={12} />
               </button>
             </div>
             <div className="tc-list-scroll">
               {loading ? (
-                <div style={{ padding: 20, textAlign: 'center', color: 'var(--tx-3)', fontSize: 12 }}>Chargement…</div>
-              ) : filtered.length === 0 ? (
+                <div style={sLoadingText}>Chargement…</div>
+              ) : filteredGroups.length === 0 ? (
                 <div className="tc-empty"><MessageSquare size={28} color="var(--border)" /><span>Aucun client</span></div>
-              ) : filtered.map(lead => {
-                const sc = STATUS_CONFIG[lead.status] || STATUS_CONFIG.new
+              ) : filteredGroups.map(group => {
+                const sc = STATUS_CONFIG[group.latestStatus] || STATUS_CONFIG.new
+                const hasMulti = group.apps.length > 1
                 return (
-                  <div key={lead.id} className="tc-lead-card" onClick={() => openClient(lead)}>
-                    <div className="tc-avatar">{(lead.name || 'AA').slice(0, 2).toUpperCase()}</div>
+                  <div key={group.key} className="tc-lead-card" onClick={() => openClient(group)}>
+                    <div className="tc-avatar">{(group.name || 'AA').slice(0, 2).toUpperCase()}</div>
                     <div className="tc-lead-info">
-                      <div className="tc-lead-name">{lead.name}</div>
-                      <div className="tc-lead-meta">{lead.phone}{lead.type ? ` · ${lead.type}` : ''}</div>
+                      <div className="tc-lead-name">
+                        {group.name}
+                        {hasMulti && <span className="tc-multi-badge">{group.apps.length} apps</span>}
+                      </div>
+                      <div className="tc-lead-meta">
+                        {group.phone}
+                        {hasMulti
+                          ? ` · ${group.apps.map(a => a.type || 'App').join(', ')}`
+                          : group.apps[0]?.type ? ` · ${group.apps[0].type}` : ''
+                        }
+                      </div>
                     </div>
                     <div className="tc-lead-right">
-                      <span className="tc-badge" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
-                      {lead.unread_count > 0 && <div className="tc-unread-dot">{lead.unread_count}</div>}
+                      <span className="tc-badge" style={badgeStyle(sc)}>{sc.label}</span>
+                      {group.unreadTotal > 0 && <div className="tc-unread-dot">{group.unreadTotal}</div>}
                     </div>
                   </div>
                 )
@@ -624,12 +731,28 @@ export default function TabClients() {
         )}
 
         {/* ══ DETAIL ══ */}
-        {view === 'detail' && selected && (
+        {view === 'detail' && selected && selectedApp && (
           <div className="tc-detail">
             <div className="tc-detail-head">
               <button className="tc-back-btn" onClick={backToList}><ArrowLeft size={13} /> Liste</button>
               <div className="tc-avatar tc-avatar--sm">{(selected.name || 'AA').slice(0, 2).toUpperCase()}</div>
-              <span className="tc-detail-name">{selected.name} · {selected.phone}</span>
+              <div className="tc-detail-info">
+                <div className="tc-detail-name">{selected.name} · {selected.phone}</div>
+                {/* ✅ Sélecteur d'app si client multi-projets */}
+                {selected.apps.length > 1 && (
+                  <div className="tc-app-switcher">
+                    {selected.apps.map(app => (
+                      <button
+                        key={app.id}
+                        className={`tc-app-btn${selectedApp.id === app.id ? ' tc-app-btn--active' : ' tc-app-btn--idle'}`}
+                        onClick={() => { setSelectedApp(app); setMessages([]) }}
+                      >
+                        {app.type || 'App'} · {new Date(app.created_at).toLocaleDateString('fr-FR')}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="tc-tab-btns">
                 <button className={`tc-tab-btn${detailTab === 'info' ? ' tc-tab-btn--active' : ''}`} onClick={() => setDetailTab('info')}>
                   <User size={12} /> Infos
@@ -650,31 +773,32 @@ export default function TabClients() {
                     <div className="tc-field"><label>Nom</label><span>{selected.name || '—'}</span></div>
                     <div className="tc-field"><label>Téléphone</label><span>{selected.phone || '—'}</span></div>
                     <div className="tc-field"><label>Email</label><span>{selected.email || '—'}</span></div>
-                    <div className="tc-field"><label>Source</label><span>{selected.source || '—'}</span></div>
+                    <div className="tc-field"><label>Source</label><span>{selectedApp.source || '—'}</span></div>
                   </div>
                 </div>
                 <div className="tc-section">
-                  <div className="tc-section-title"><AlertCircle size={11} /> Détails demande</div>
+                  <div className="tc-section-title"><AlertCircle size={11} /> Détails demande {selected.apps.length > 1 ? `— ${selectedApp.type || 'App'} (${new Date(selectedApp.created_at).toLocaleDateString('fr-FR')})` : ''}</div>
                   <div className="tc-grid2">
-                    <div className="tc-field"><label>Type app</label><span>{selected.type || '—'}</span></div>
-                    <div className="tc-field"><label>Pack</label><span>{selected.pack || '—'}</span></div>
-                    <div className="tc-field"><label>Date</label><span>{selected.created_at ? new Date(selected.created_at).toLocaleDateString('fr-FR') : '—'}</span></div>
+                    <div className="tc-field"><label>Type app</label><span>{selectedApp.type || '—'}</span></div>
+                    <div className="tc-field"><label>Pack</label><span>{selectedApp.pack || '—'}</span></div>
+                    <div className="tc-field"><label>Date</label><span>{selectedApp.created_at ? new Date(selectedApp.created_at).toLocaleDateString('fr-FR') : '—'}</span></div>
+                    <div className="tc-field"><label>Montant estimé</label><span style={sGoldText}>{selectedApp.pay_amount ? `${selectedApp.pay_amount} DT` : '—'}</span></div>
                     <div className="tc-field"><label>Statut</label>
-                      <span style={{ color: STATUS_CONFIG[selected.status]?.color || 'var(--tx-2)' }}>
-                        {STATUS_CONFIG[selected.status]?.label || selected.status}
+                      <span style={statusColorStyle(selectedApp.status)}>
+                        {STATUS_CONFIG[selectedApp.status]?.label || selectedApp.status}
                       </span>
                     </div>
                   </div>
                   <div className="tc-status-bar">
                     <span className="tc-status-bar-label">Changer :</span>
                     {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-                      <button key={k} className={`tc-status-btn${selected.status === k ? ' tc-status-btn--active' : ''}`}
+                      <button key={k} className={`tc-status-btn${selectedApp.status === k ? ' tc-status-btn--active' : ''}`}
                         onClick={() => changeStatus(k)}>{v.label}</button>
                     ))}
                   </div>
                 </div>
                 <div className="tc-section">
-                  <DemoPanel lead={selected} onRefresh={fetchLeads} />
+                  <DemoPanel lead={selectedApp} onRefresh={fetchLeads} />
                 </div>
               </div>
             )}
@@ -689,7 +813,7 @@ export default function TabClients() {
                       {m.text}
                       <div className="tc-bubble-ts">
                         {new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                        {m.sender === 'admin' && <CheckCheck size={10} style={{ marginLeft: 4 }} />}
+                        {m.sender === 'admin' && <CheckCheck size={10} style={sCheckMark} />}
                       </div>
                     </div>
                   ))}
