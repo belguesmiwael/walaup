@@ -1,11 +1,12 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   LayoutDashboard, MessageSquare, CreditCard,
   Smartphone, Star, LogOut, Menu, X, ArrowLeft,
-  ChevronLeft, ChevronRight, PlusCircle
+  ChevronLeft, ChevronRight, PlusCircle, Bell,
+  CheckCircle2, AlertCircle, Info
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import TabProjet from '@/components/client/tabs/TabProjet'
@@ -341,6 +342,85 @@ const CSS = `
     .cl-content--messages { padding: 0; }
     .cl-newapp-fab { bottom: 74px; right: 14px; padding: 10px 14px; font-size: 12px; }
   }
+
+  /* ── Toast notifications ── */
+  .cl-toasts {
+    position: fixed;
+    top: 16px; right: 16px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+  }
+  .cl-toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    background: rgba(13,17,32,0.97);
+    border: 1px solid rgba(99,102,241,0.3);
+    border-radius: 14px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    backdrop-filter: blur(20px);
+    min-width: 280px;
+    max-width: 340px;
+    pointer-events: all;
+    animation: cl-toast-in .3s cubic-bezier(0.34,1.56,0.64,1);
+    position: relative;
+    overflow: hidden;
+  }
+  .cl-toast--success { border-color: rgba(16,185,129,0.4); }
+  .cl-toast--warning { border-color: rgba(245,158,11,0.4); }
+  .cl-toast--error   { border-color: rgba(248,113,113,0.4); }
+  .cl-toast-icon {
+    width: 34px; height: 34px; min-width: 34px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .cl-toast-body { flex: 1; min-width: 0; }
+  .cl-toast-title {
+    font-size: 13px; font-weight: 700;
+    color: var(--tx); margin-bottom: 3px;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .cl-toast-text {
+    font-size: 12px; color: var(--tx-2);
+    line-height: 1.45;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cl-toast-close {
+    width: 22px; height: 22px;
+    border: none; background: none;
+    color: var(--tx-3); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px; flex-shrink: 0;
+    transition: all .15s;
+  }
+  .cl-toast-close:hover { background: rgba(255,255,255,.08); color: var(--tx); }
+  .cl-toast-progress {
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 2px;
+    background: var(--ac);
+    animation: cl-toast-progress 5s linear forwards;
+    border-radius: 0 0 14px 14px;
+  }
+  .cl-toast--success .cl-toast-progress { background: #10B981; }
+  .cl-toast--warning .cl-toast-progress { background: #F59E0B; }
+  @keyframes cl-toast-in {
+    from { opacity: 0; transform: translateX(60px) scale(0.92); }
+    to   { opacity: 1; transform: translateX(0) scale(1); }
+  }
+  @keyframes cl-toast-progress {
+    from { width: 100%; }
+    to   { width: 0%; }
+  }
+  @media (max-width: 768px) {
+    .cl-toasts { top: 56px; right: 10px; left: 10px; }
+    .cl-toast  { min-width: unset; max-width: 100%; }
+  }
 `
 
 const TABS = [
@@ -361,6 +441,8 @@ export default function ClientPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [unreadMsg, setUnreadMsg]   = useState(0)
   const [loading, setLoading]       = useState(true)
+  const [toasts, setToasts]         = useState([])
+  const notifChannelRef             = useRef(null)
 
   // ── Fullscreen — cache navbar + footer du layout global
   useEffect(() => {
@@ -393,6 +475,46 @@ export default function ClientPage() {
     setLead(data[0])
   }
 }, [])
+
+  // ── Système de notifications toast ──────────────────────────────────────────
+const addToast = useCallback((notif) => {
+  const id = Date.now()
+  setToasts(prev => [...prev.slice(-3), { ...notif, id }]) // max 4 toasts
+  WalaupSound.notif()
+  // Auto-dismiss après 5s
+  setTimeout(() => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }, 5000)
+}, [])
+
+useEffect(() => {
+  if (!leads || leads.length === 0) return
+
+  const leadIds = leads.map(l => l.id)
+
+  if (notifChannelRef.current) supabase.removeChannel(notifChannelRef.current)
+  notifChannelRef.current = supabase
+    .channel('client-notifications')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'notifications'
+    }, ({ new: notif }) => {
+      // Filtre côté client — uniquement nos leads
+      if (notif.target_role !== 'client') return
+      if (!leadIds.includes(notif.target_id)) return
+      addToast(notif)
+      // Marquer comme lu après 5s
+      setTimeout(() => {
+        supabase.from('notifications').update({ is_read: true }).eq('id', notif.id).then(() => {})
+      }, 5000)
+    })
+    .subscribe()
+
+  return () => {
+    if (notifChannelRef.current) supabase.removeChannel(notifChannelRef.current)
+  }
+}, [leads, addToast])
 
   // ── Auth
   useEffect(() => {
@@ -633,6 +755,40 @@ export default function ClientPage() {
         )}
 
       </div>
+
+        {/* ── Toast notifications ── */}
+      {toasts.length > 0 && (
+        <div className="cl-toasts">
+          {toasts.map(toast => {
+            const typeMap = {
+              success: { icon: CheckCircle2, color: '#10B981', bg: 'rgba(16,185,129,0.12)', cls: 'cl-toast--success' },
+              warning: { icon: AlertCircle,  color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  cls: 'cl-toast--warning' },
+              error:   { icon: AlertCircle,  color: '#F87171', bg: 'rgba(248,113,113,0.12)', cls: 'cl-toast--error'   },
+              info:    { icon: Info,         color: '#6366F1', bg: 'rgba(99,102,241,0.12)',  cls: ''                  },
+              message: { icon: MessageSquare,color: '#6366F1', bg: 'rgba(99,102,241,0.12)',  cls: ''                  },
+            }
+            const t = typeMap[toast.type] || typeMap.info
+            const Icon = t.icon
+            return (
+              <div key={toast.id} className={`cl-toast ${t.cls}`}>
+                <div className="cl-toast-icon" style={{ background: t.bg }}>
+                  <Icon size={16} color={t.color} />
+                </div>
+                <div className="cl-toast-body">
+                  <div className="cl-toast-title">{toast.title}</div>
+                  {toast.body && <div className="cl-toast-text">{toast.body}</div>}
+                </div>
+                <button
+                  className="cl-toast-close"
+                  onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}>
+                  <X size={13} />
+                </button>
+                <div className="cl-toast-progress" />
+              </div>
+            )
+          })}
+        </div>
+      )}
     </>
   )
 }
