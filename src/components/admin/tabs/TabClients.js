@@ -72,6 +72,104 @@ const DEMO_STATUS_UI = {
   disabled:         { label: '🚫 Désactivée',            color: '#374151', bg: 'rgba(55,65,81,0.1)'   },
 }
 
+// ─── Générateur de prompt dev ─────────────────────────────────────────────────
+function generateDevPrompt(lead) {
+  // Parser la note de l'estimateur
+  const note = lead.note || ''
+  const getField = (key) => {
+    const match = note.match(new RegExp(key + ': ([^\n]+)'))
+    return match ? match[1].trim() : null
+  }
+
+  const appName     = getField('App')             || lead.type || 'Application'
+  const users       = getField('Utilisateurs')    || 'non précisé'
+  const langue      = getField('Langue')          || 'Français'
+  const plateforme  = getField('Plateforme')      || 'Web + Mobile'
+  const features    = getField('Fonctionnalités') || 'non précisées'
+  const estimation  = getField('Estimation')      || (lead.pay_amount ? `${lead.pay_amount} DT` : 'non précisée')
+  const message     = getField('Message')         || ''
+  const sector      = lead.type   || 'Non précisé'
+  const pack        = lead.pack   || 'Essentiel'
+  const clientName  = lead.name   || 'Client'
+  const clientPhone = lead.phone  || ''
+  const clientEmail = lead.email  || ''
+
+  const packDetails = {
+    essentiel:  'Fonctionnalités de base uniquement, interface simple, 1 rôle utilisateur',
+    pro:        'Toutes les fonctionnalités, dashboard avancé, multi-rôles, rapports',
+    partenaire: 'App complète premium, multi-tenant ready, revendable à d\'autres entreprises',
+  }
+  const packDesc = packDetails[pack.toLowerCase()] || packDetails.essentiel
+
+  return `Tu es un senior full-stack engineer expert Next.js 15 App Router + Supabase + Tailwind CSS.
+
+Construis une application web professionnelle complète pour un client tunisien.
+
+---
+
+## 📋 CONTEXTE CLIENT
+
+- **Client :** ${clientName}${clientPhone ? ` · ${clientPhone}` : ''}${clientEmail ? ` · ${clientEmail}` : ''}
+- **Secteur :** ${sector}
+- **Nom de l'application :** ${appName}
+- **Pack souscrit :** ${pack} — ${packDesc}
+- **Estimation budget :** ${estimation}
+${message ? `- **Message client :** ${message}` : ''}
+
+---
+
+## 🎯 SPÉCIFICATIONS TECHNIQUES
+
+- **Utilisateurs estimés :** ${users}
+- **Langue interface :** ${langue}
+- **Plateformes :** ${plateforme}
+- **Fonctionnalités demandées :** ${features}
+
+---
+
+## 🔧 STACK OBLIGATOIRE
+
+- **Framework :** Next.js 15 App Router (JavaScript, pas TypeScript)
+- **Base de données :** Supabase (PostgreSQL + Auth + Realtime + Storage)
+- **Style :** Tailwind CSS + design system Aurora Futurism dark
+- **Palette :** bg #080B14, accent #6366F1/#8B5CF6, gold #F59E0B, texte #EEF0FF
+- **Fonts :** Space Grotesk (titres) + Inter (body) + JetBrains Mono (valeurs)
+- **Icons :** Lucide React uniquement
+- **Auth :** Supabase Auth avec RLS sur toutes les tables
+
+---
+
+## 🏗️ CE QUE TU DOIS PRODUIRE
+
+1. **Schéma Supabase complet** — toutes les tables avec RLS policies
+2. **Structure fichiers Next.js** — app/, components/, lib/
+3. **Pages principales** selon les fonctionnalités demandées
+4. **Design Aurora Futurism** — dark mode forcé, glassmorphism, animations 200-280ms ease-out-expo
+5. **Réponse aux besoins métier** de ce secteur (${sector})
+
+---
+
+## 📐 RÈGLES DE DÉVELOPPEMENT
+
+- JavaScript uniquement — jamais TypeScript
+- Dark mode uniquement — jamais de toggle
+- Mobile-first — breakpoint 768px
+- RLS actif sur TOUTES les tables
+- Images via JS (pas dans innerHTML)
+- Tri client-side — jamais orderBy composite Supabase
+- Touch targets ≥ 44px mobile
+
+---
+
+## 🚀 COMMENCE PAR
+
+1. Analyser les fonctionnalités demandées et proposer l'architecture complète
+2. Écrire le schéma Supabase avec migrations SQL
+3. Construire les pages dans l'ordre de priorité métier
+
+Sois direct, professionnel, et produis du code production-ready.`
+}
+
 const CSS = `
   .tc-root { height:100%; overflow:hidden; display:flex; flex-direction:column; }
 
@@ -841,6 +939,38 @@ export default function TabClients() {
                 </div>
                 <div className="tc-section">
                   <DemoPanel lead={selectedApp} onRefresh={fetchLeads} />
+               </div>
+                    {/* ── Bouton générer prompt Claude ── */}
+                <div className="tc-section" style={{ borderColor: 'rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.04)' }}>
+                  <div className="tc-section-title" style={{ color: 'var(--ac)' }}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                    Développement
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--tx-2)', marginBottom: 14, lineHeight: 1.6 }}>
+                    Génère le prompt de développement complet pour cette app et ouvre Claude directement.
+                  </p>
+                  <button
+                    onClick={() => {
+                      const prompt = generateDevPrompt(selectedApp)
+                      const url = 'https://claude.ai/new?q=' + encodeURIComponent(prompt)
+                      window.open(url, '_blank')
+                    }}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 8,
+                      padding: '10px 18px', borderRadius: 11,
+                      background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                      border: 'none', color: '#fff',
+                      fontSize: 13, fontWeight: 700,
+                      cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif",
+                      boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
+                      transition: 'all .2s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                    Coder cette app dans Claude
+                  </button>
                 </div>
               </div>
             )}
