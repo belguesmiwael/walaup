@@ -136,12 +136,9 @@ function StepIndicator({ current }) {
   const ratio = total > 1 ? (current - 1) / (total - 1) : 0
   const r100  = (ratio * 100).toFixed(2)
   const r30   = (ratio * 30).toFixed(2)
-  // Progress line: from center of circle-1 (left:15px) to center of circle-N
-  // Full span = 100% - 30px, progress = ratio * that span
   const progressW = ratio === 0 ? '0px' : 'calc(' + r100 + '% - ' + r30 + 'px)'
   const progClass  = ratio >= 1 ? 'est-prog-done' : ratio > 0 ? 'est-prog-wave' : ''
 
-  // Styles
   const sOuter      = { position: 'relative', width: '100%', paddingBottom: 4 }
   const sCircleRow  = { position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 30, marginBottom: 6 }
   const sBaseLine   = { position: 'absolute', top: '50%', left: 15, right: 15, height: 2, marginTop: -1, background: 'rgba(255,255,255,0.07)', borderRadius: 1, zIndex: 0 }
@@ -152,8 +149,6 @@ function StepIndicator({ current }) {
     <>
       <style>{waveCss}</style>
       <div style={sOuter}>
-
-        {/* ── Circles row (lines behind via absolute) ── */}
         <div style={sCircleRow}>
           <div style={sBaseLine} />
           <div style={sProgressLine} className={progClass} />
@@ -164,7 +159,6 @@ function StepIndicator({ current }) {
             const cStyle = {
               width: 30, height: 30, borderRadius: '50%',
               flexShrink: 0, position: 'relative', zIndex: 1,
-              // Solid background so the line behind is hidden under the circle
               background: done ? 'var(--ac)' : act ? '#1a1b3a' : '#0d1020',
               border: '2px solid ' + (done ? 'var(--ac)' : act ? 'var(--ac)' : 'rgba(255,255,255,0.15)'),
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -188,8 +182,6 @@ function StepIndicator({ current }) {
             )
           })}
         </div>
-
-        {/* ── Labels row ── */}
         <div style={sLabelRow}>
           {STEP_LABELS.map(function(label, i) {
             const n    = i + 1
@@ -206,7 +198,6 @@ function StepIndicator({ current }) {
             return <span key={n} style={lStyle}>{label}</span>
           })}
         </div>
-
       </div>
     </>
   )
@@ -246,7 +237,7 @@ function PriceSidebar({ sector, pack, features, selectedFeatures, compact }) {
   const sHeadSub   = { fontSize:10, color:'var(--tx-3)' }
 
   const sPriceBox = {
-    background: compact ? 'rgba(99,102,241,0.07)' : 'rgba(99,102,241,0.07)',
+    background: 'rgba(99,102,241,0.07)',
     borderRadius: compact ? 11 : 13,
     padding: compact ? '10px 12px' : '15px',
     marginBottom: compact ? 0 : 13,
@@ -517,7 +508,6 @@ function StepFeatures({ features, selected, onToggle }) {
                   transform: active ? 'scale(1.01)' : 'scale(1)',
                   boxShadow: active ? '0 3px 14px rgba(99,102,241,0.15)' : 'none',
                 }
-                // Icon: always a valid Lucide component after merge
                 const FeatIcon  = typeof feat.icon === 'string' ? (ICON_MAP[feat.icon] || Package) : (feat.icon || Package)
                 const featColor = feat.color || '#6366F1'
                 const icoColor  = active ? '#ffffff' : featColor
@@ -650,7 +640,6 @@ function StepContact({ data, onChange, onSubmit, submitting }) {
   const sGrid   = { display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }
   const sGuarantees = { display:'flex', gap:16, flexWrap:'wrap', marginBottom:20 }
   const sGItem  = { display:'flex', alignItems:'center', gap:6 }
-  const sGIco   = { fontSize:14 }
   const sGTxt   = { fontSize:12, color:'var(--tx-3)' }
   const sSubmitBase = {
     width:'100%', padding:'14px 20px',
@@ -776,11 +765,11 @@ export default function EstimateurPage() {
   const [contactInfo,      setContactInfo]      = useState({ name:'', phone:'', email:'', message:'' })
   const [features,         setFeatures]         = useState(DEFAULT_FEATURES)
 
+  // Charge les fonctionnalités depuis Supabase (config)
   useEffect(function() {
     supabase.from('config').select('value').eq('key','estimateur_features').single()
       .then(function(res) {
         if (res.data && res.data.value && Array.isArray(res.data.value) && res.data.value.length > 0) {
-          // Merge Supabase data with DEFAULT_FEATURES to preserve Lucide icons & colors
           var merged = res.data.value.map(function(f) {
             var def = DEFAULT_FEATURES.find(function(d) { return d.id === f.id })
             return Object.assign({}, f, {
@@ -793,6 +782,7 @@ export default function EstimateurPage() {
       }).catch(function() {})
   }, [])
 
+  // Cache navbar + footer (plein écran)
   useEffect(function() {
     var toHide = [
       ...document.querySelectorAll('nav'),
@@ -824,64 +814,62 @@ export default function EstimateurPage() {
     })
   }
 
-  // ─── CORRECTIF : sauvegarde pay_amount dans la BDD ────────────────────────────
-// Remplace l'ancienne fonction handleSubmit dans EstimateurPage()
-async function handleSubmit() {
- if (!contactInfo.name.trim() || !contactInfo.phone.trim()) {
- WalaupSound && WalaupSound.error && WalaupSound.error()
- return
- }
- setSubmitting(true)
- WalaupSound && WalaupSound.send && WalaupSound.send()
- try {
- const featList = Array.from(selectedFeatures).map(function(id) {
- const f = features.find(function(f) { return f.id === id })
- return f ? f.name : null
- }).filter(Boolean)
+  // ✅ handleSubmit — sauvegarde pay_amount dans la BDD
+  async function handleSubmit() {
+    if (!contactInfo.name.trim() || !contactInfo.phone.trim()) {
+      WalaupSound && WalaupSound.error && WalaupSound.error()
+      return
+    }
+    setSubmitting(true)
+    WalaupSound && WalaupSound.send && WalaupSound.send()
+    try {
+      const featList = Array.from(selectedFeatures).map(function(id) {
+        const f = features.find(function(f) { return f.id === id })
+        return f ? f.name : null
+      }).filter(Boolean)
 
- const packObj = PACKS.find(function(p) { return p.id === selectedPack })
- const basePrice = packObj ? packObj.price.from : 0
- const extraPrice = Array.from(selectedFeatures).reduce(function(s, id) {
- const f = features.find(function(f) { return f.id === id })
- return s + (f ? f.price : 0)
- }, 0)
- // ✅ NOUVEAU : montant total calculé
- const totalPrice = basePrice + extraPrice
+      const packObj   = PACKS.find(function(p) { return p.id === selectedPack })
+      const basePrice = packObj ? packObj.price.from : 0
+      const extraPrice = Array.from(selectedFeatures).reduce(function(s, id) {
+        const f = features.find(function(f) { return f.id === id })
+        return s + (f ? f.price : 0)
+      }, 0)
+      // ✅ Montant total calculé
+      const totalPrice = basePrice + extraPrice
 
- const sectorLabel = SECTORS.find(function(s) { return s.id === sector })
+      const sectorLabel = SECTORS.find(function(s) { return s.id === sector })
 
- await supabase.from('leads').insert({
- name: contactInfo.name.trim(),
- phone: contactInfo.phone.trim(),
- email: contactInfo.email.trim() || null,
- type: sectorLabel ? sectorLabel.label : sector,
- pack: selectedPack || null,
- status: 'new',
- source: 'estimateur',
- // ✅ NOUVEAU : pay_amount enregistré directement en BDD
- pay_amount: totalPrice,
- note: [
- 'App: ' + baseInfo.appName,
- 'Utilisateurs: ' + baseInfo.users,
- 'Langue: ' + baseInfo.language,
- 'Plateforme: ' + baseInfo.platform,
- 'Fonctionnalités: ' + featList.join(', '),
- 'Estimation: ' + totalPrice + ' DT',
- contactInfo.message ? 'Message: ' + contactInfo.message : '',
- ].filter(Boolean).join('\n'),
- created_at: new Date().toISOString(),
- updated_at: new Date().toISOString(),
- })
+      await supabase.from('leads').insert({
+        name:       contactInfo.name.trim(),
+        phone:      contactInfo.phone.trim(),
+        email:      contactInfo.email.trim() || null,
+        type:       sectorLabel ? sectorLabel.label : sector,
+        pack:       selectedPack || null,
+        status:     'new',
+        source:     'estimateur',
+        pay_amount: totalPrice,  // ✅ Montant enregistré en BDD → affiché dans le modal paiement client
+        note: [
+          'App: '           + baseInfo.appName,
+          'Utilisateurs: '  + baseInfo.users,
+          'Langue: '        + baseInfo.language,
+          'Plateforme: '    + baseInfo.platform,
+          'Fonctionnalités: ' + featList.join(', '),
+          'Estimation: '    + totalPrice + ' DT',
+          contactInfo.message ? 'Message: ' + contactInfo.message : '',
+        ].filter(Boolean).join('\n'),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
 
- WalaupSound && WalaupSound.success && WalaupSound.success()
- setSubmitted(true)
- } catch(e) {
- console.error(e)
- WalaupSound && WalaupSound.error && WalaupSound.error()
- } finally {
- setSubmitting(false)
- }
-}
+      WalaupSound && WalaupSound.success && WalaupSound.success()
+      setSubmitted(true)
+    } catch(e) {
+      console.error(e)
+      WalaupSound && WalaupSound.error && WalaupSound.error()
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   // ── CSS
   const pageCss = [
@@ -901,7 +889,6 @@ async function handleSubmit() {
     '@media (min-width:769px) { .est-sidebar-m { display:none !important; } .est-sidebar-d { display:block !important; } }',
   ].join('\n')
 
-  // ── Styles page
   const sSuccess = { minHeight:'100vh', background:'var(--bg-base)', display:'flex', alignItems:'center', justifyContent:'center' }
   const sHeader  = { padding:'20px 24px 16px', flexShrink:0 }
   const sTagWrap = { display:'inline-flex', alignItems:'center', gap:7, padding:'4px 13px', background:'rgba(99,102,241,0.1)', border:'1px solid rgba(99,102,241,0.22)', borderRadius:20, marginBottom:8 }
