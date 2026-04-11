@@ -824,53 +824,64 @@ export default function EstimateurPage() {
     })
   }
 
-  async function handleSubmit() {
-    if (!contactInfo.name.trim() || !contactInfo.phone.trim()) {
-      WalaupSound && WalaupSound.error && WalaupSound.error()
-      return
-    }
-    setSubmitting(true)
-    WalaupSound && WalaupSound.send && WalaupSound.send()
-    try {
-      const featList   = Array.from(selectedFeatures).map(function(id) {
-        const f = features.find(function(f) { return f.id === id })
-        return f ? f.name : null
-      }).filter(Boolean)
-      const packObj    = PACKS.find(function(p) { return p.id === selectedPack })
-      const basePrice  = packObj ? packObj.price.from : 0
-      const extraPrice = Array.from(selectedFeatures).reduce(function(s, id) {
-        const f = features.find(function(f) { return f.id === id })
-        return s + (f ? f.price : 0)
-      }, 0)
-      const sectorLabel = SECTORS.find(function(s) { return s.id === sector })
-      await supabase.from('leads').insert({
-        name:  contactInfo.name.trim(),
-        phone: contactInfo.phone.trim(),
-        email: contactInfo.email.trim() || null,
-        type:  sectorLabel ? sectorLabel.label : sector,
-        pack:  selectedPack || null,
-        status: 'new', source: 'estimateur',
-        note: [
-          'App: ' + baseInfo.appName,
-          'Utilisateurs: ' + baseInfo.users,
-          'Langue: ' + baseInfo.language,
-          'Plateforme: ' + baseInfo.platform,
-          'Fonctionnalités: ' + featList.join(', '),
-          'Estimation: ' + (basePrice + extraPrice) + ' DT',
-          contactInfo.message ? 'Message: ' + contactInfo.message : '',
-        ].filter(Boolean).join('\n'),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      WalaupSound && WalaupSound.success && WalaupSound.success()
-      setSubmitted(true)
-    } catch(e) {
-      console.error(e)
-      WalaupSound && WalaupSound.error && WalaupSound.error()
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  // ─── CORRECTIF : sauvegarde pay_amount dans la BDD ────────────────────────────
+// Remplace l'ancienne fonction handleSubmit dans EstimateurPage()
+async function handleSubmit() {
+ if (!contactInfo.name.trim() || !contactInfo.phone.trim()) {
+ WalaupSound && WalaupSound.error && WalaupSound.error()
+ return
+ }
+ setSubmitting(true)
+ WalaupSound && WalaupSound.send && WalaupSound.send()
+ try {
+ const featList = Array.from(selectedFeatures).map(function(id) {
+ const f = features.find(function(f) { return f.id === id })
+ return f ? f.name : null
+ }).filter(Boolean)
+
+ const packObj = PACKS.find(function(p) { return p.id === selectedPack })
+ const basePrice = packObj ? packObj.price.from : 0
+ const extraPrice = Array.from(selectedFeatures).reduce(function(s, id) {
+ const f = features.find(function(f) { return f.id === id })
+ return s + (f ? f.price : 0)
+ }, 0)
+ // ✅ NOUVEAU : montant total calculé
+ const totalPrice = basePrice + extraPrice
+
+ const sectorLabel = SECTORS.find(function(s) { return s.id === sector })
+
+ await supabase.from('leads').insert({
+ name: contactInfo.name.trim(),
+ phone: contactInfo.phone.trim(),
+ email: contactInfo.email.trim() || null,
+ type: sectorLabel ? sectorLabel.label : sector,
+ pack: selectedPack || null,
+ status: 'new',
+ source: 'estimateur',
+ // ✅ NOUVEAU : pay_amount enregistré directement en BDD
+ pay_amount: totalPrice,
+ note: [
+ 'App: ' + baseInfo.appName,
+ 'Utilisateurs: ' + baseInfo.users,
+ 'Langue: ' + baseInfo.language,
+ 'Plateforme: ' + baseInfo.platform,
+ 'Fonctionnalités: ' + featList.join(', '),
+ 'Estimation: ' + totalPrice + ' DT',
+ contactInfo.message ? 'Message: ' + contactInfo.message : '',
+ ].filter(Boolean).join('\n'),
+ created_at: new Date().toISOString(),
+ updated_at: new Date().toISOString(),
+ })
+
+ WalaupSound && WalaupSound.success && WalaupSound.success()
+ setSubmitted(true)
+ } catch(e) {
+ console.error(e)
+ WalaupSound && WalaupSound.error && WalaupSound.error()
+ } finally {
+ setSubmitting(false)
+ }
+}
 
   // ── CSS
   const pageCss = [
