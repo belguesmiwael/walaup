@@ -176,7 +176,8 @@ export default function TabMessages({ lead, session, isActive, onUnreadChange })
   const msgChannelRef = useRef(null)
   const typingChannelRef = useRef(null)
   const pollRef = useRef(null)
-
+  const isTypingRef = useRef(false)
+  
   const scrollToEnd = useCallback((smooth = true) => {
     endRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' })
   }, [])
@@ -272,6 +273,7 @@ export default function TabMessages({ lead, session, isActive, onUnreadChange })
       if (typingChannelRef.current) supabase.removeChannel(typingChannelRef.current)
       clearTimeout(typingTimer.current)
       document.removeEventListener('visibilitychange', onVisible)
+      isTypingRef.current = false
       supabase.from('leads').update({ client_typing: false }).eq('id', lead.id).then(() => {})
     }
   }, [lead?.id, fetchMessages, scrollToEnd, isActive])
@@ -290,14 +292,19 @@ export default function TabMessages({ lead, session, isActive, onUnreadChange })
   }, [adminTyping, loading, scrollToEnd])
 
   function onInput(e) {
-    setText(e.target.value)
-    if (!lead?.id) return
+  setText(e.target.value)
+  if (!lead?.id) return
+  // Écriture DB uniquement si pas déjà en train de taper — évite le spam
+  if (!isTypingRef.current) {
+    isTypingRef.current = true
     supabase.from('leads').update({ client_typing: true }).eq('id', lead.id).then(() => {})
-    clearTimeout(typingTimer.current)
-    typingTimer.current = setTimeout(() => {
-      supabase.from('leads').update({ client_typing: false }).eq('id', lead.id).then(() => {})
-    }, 2200)
   }
+  clearTimeout(typingTimer.current)
+  typingTimer.current = setTimeout(() => {
+    isTypingRef.current = false
+    supabase.from('leads').update({ client_typing: false }).eq('id', lead.id).then(() => {})
+  }, 2200)
+}
 
   async function sendMsg() {
     const t = text.trim()
