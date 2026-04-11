@@ -490,13 +490,13 @@ export default function TabProjet({ lead: initialLead, leads: allLeads, session,
       .then(({ data }) => { if (data) setConfig(data.value) })
   }, [])
 
-  // ✅ REALTIME : mise à jour instantanée quand admin change le lead
+  // ✅ REALTIME : mise à jour instantanée — sans filtre DB (plus fiable que le filtre Supabase)
   useEffect(() => {
     if (!lead?.id) return
     const channel = supabase
       .channel(`lead-proj-${lead.id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'leads', filter: `id=eq.${lead.id}` }, (payload) => {
-        if (!payload.new) return
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'leads' }, (payload) => {
+        if (!payload.new || payload.new.id !== lead.id) return  // filtre côté client
         setLocalLead(payload.new)
         if (setLead) setLead(payload.new)
       })
