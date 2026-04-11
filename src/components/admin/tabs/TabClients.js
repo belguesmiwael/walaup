@@ -359,20 +359,40 @@ function DemoPanel({ lead, onRefresh }) {
     const m = deepClone(meta)
     m.demos = m.demos.map(d => ({ ...d, status: 'disabled' }))
     m.finalUrl = url
-    m.payStatus = 'delivered'  // ✅ marque la livraison dans le meta
-    // ✅ Mise à jour ATOMIQUE (1 seule requête) — évite la race condition entre 2 updates séparés
-    const { error } = await supabase.from('leads').update({
-      note: encodeDemoMeta(m),
-      status: 'delivered',
-      pay_ref: url,
-    }).eq('id', lead.id)
-    if (error) { alert('Erreur livraison : ' + error.message); setSaving(false); return }
-    setMetaState(m)  // mise à jour locale immédiate
+    m.payStatus = 'delivered'
+
+    // ✅ Mise à jour ATOMIQUE — 1 seule requête
+    const { data: updatedRows, error } = await supabase
+      .from('leads')
+      .update({ note: encodeDemoMeta(m), status: 'delivered', pay_ref: url })
+      .eq('id', lead.id)
+      .select()  // ✅ retourne les lignes mises à jour pour confirmer
+
+    if (error) {
+      console.error('[deliverFinal] RLS ou DB error:', error)
+      alert('❌ Erreur livraison : ' + error.message + '\n\nVérifiez les RLS policies sur la table leads (UPDATE pour super_admin).')
+      setSaving(false)
+      return
+    }
+
+    // Vérification que l\'UPDATE a bien touché une ligne
+    if (!updatedRows || updatedRows.length === 0) {
+      console.warn('[deliverFinal] Aucune ligne mise à jour — RLS silencieuse?', { leadId: lead.id })
+      alert('⚠️ La livraison a échoué silencieusement. Vérifiez la RLS policy UPDATE sur la table leads pour les super_admin.')
+      setSaving(false)
+      return
+    }
+
+    // Mise à jour locale immédiate (avant onRefresh)
+    setMetaState(m)
+    setFinalUrl(url)
+
     await supabase.from('messages').insert({
       lead_id: lead.id, sender: 'admin',
       text: `🎉 Félicitations ! Votre application est prête et déployée : ${url}`
     })
-    await onRefresh(); setSaving(false)
+    await onRefresh()
+    setSaving(false)
   }
 
   const payStatus = meta.payStatus || 'none'
