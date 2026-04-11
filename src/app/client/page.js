@@ -421,23 +421,27 @@ export default function ClientPage() {
     return () => subscription.unsubscribe()
   }, [router, loadLeads])
 
-  // ── Realtime : met à jour le lead actif instantanément quand admin le change ✅
+  // ── Realtime : met à jour tous les leads du client sans filtre DB (plus fiable) ✅
   useEffect(() => {
-    if (!lead?.id) return
+    if (!session?.user?.id) return
     const channel = supabase
-      .channel(`client-lead-${lead.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'leads', filter: `id=eq.${lead.id}` },
-        (payload) => {
-          if (!payload.new) return
-          setLead(payload.new)
-          setLeads(prev => prev.map(l => l.id === payload.new.id ? payload.new : l))
-        }
-      )
+      .channel(`client-leads-rt-${session.user.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'leads' }, (payload) => {
+        if (!payload.new) return
+        const updated = payload.new
+        // Filtre côté client : on ne met à jour que nos propres leads
+        setLeads(prev => {
+          const idx = prev.findIndex(l => l.id === updated.id)
+          if (idx === -1) return prev  // pas notre lead, on ignore
+          const next = [...prev]
+          next[idx] = updated
+          return next
+        })
+        setLead(prev => prev?.id === updated.id ? updated : prev)
+      })
       .subscribe()
     return () => supabase.removeChannel(channel)
-  }, [lead?.id])
+  }, [session?.user?.id])
 
   // ── Unread messages (polling 10s)
   useEffect(() => {
