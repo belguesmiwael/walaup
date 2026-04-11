@@ -18,21 +18,23 @@ const STATUS_UI = {
   upcoming:  { label: 'À venir',  color: '#525878', bg: 'rgba(82,88,120,0.1)',   Icon: Clock },
 }
 
-// Style constants (safe from Notion corruption)
-const sHead      = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }
-const sTitle     = { fontFamily: "'Space Grotesk',sans-serif", fontWeight: 800, fontSize: 20, color: 'var(--tx)' }
-const sAddBtn    = { display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 9, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', border: 'none', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }
-const sEmpty     = { padding: '24px 16px', fontSize: 13, color: 'var(--tx-3)', textAlign: 'center' }
-const sMethodCol = { fontSize: 12, color: 'var(--tx-2)' }
-const sMsgOk     = { padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: 13, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: 'var(--green)' }
-const sMsgErr    = { padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: 13, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--red)' }
-const sModalOv   = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }
-const sModalCard = { background: '#0D1120', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 18, padding: 24, width: 460, maxWidth: '92vw' }
+// Style constants
+const sHead       = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }
+const sTitle      = { fontFamily: "'Space Grotesk',sans-serif", fontWeight: 800, fontSize: 20, color: 'var(--tx)' }
+const sAddBtn     = { display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 9, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', border: 'none', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }
+const sEmpty      = { padding: '24px 16px', fontSize: 13, color: 'var(--tx-3)', textAlign: 'center' }
+const sMsgOk      = { padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: 13, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: 'var(--green)' }
+const sMsgErr     = { padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: 13, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--red)' }
+const sModalOv    = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }
+const sModalCard  = { background: '#0D1120', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 18, padding: 24, width: 460, maxWidth: '92vw' }
 const sModalTitle = { fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 16, color: 'var(--tx)', marginBottom: 18 }
-const sLabel     = { fontSize: 11, fontWeight: 600, color: 'var(--tx-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5, display: 'block' }
-const sInp       = { width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 9, padding: '9px 12px', color: 'var(--tx)', fontSize: 13, outline: 'none', fontFamily: "'Inter',sans-serif", marginBottom: 12, boxSizing: 'border-box' }
-const sModalRow  = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }
-const sSaveBtn   = { width: '100%', padding: 11, borderRadius: 10, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 4 }
+const sLabel      = { fontSize: 11, fontWeight: 600, color: 'var(--tx-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5, display: 'block' }
+const sInp        = { width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 9, padding: '9px 12px', color: 'var(--tx)', fontSize: 13, outline: 'none', fontFamily: "'Inter',sans-serif", marginBottom: 12, boxSizing: 'border-box' }
+const sModalRow   = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }
+const sSaveBtn    = { width: '100%', padding: 11, borderRadius: 10, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 4 }
+const sDescTxt    = { fontSize: 11, color: 'var(--tx-3)' }
+const sAmountTxt  = { fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 700, color: 'var(--gold)' }
+const sMethodTxt  = { fontSize: 12, color: 'var(--tx-2)' }
 
 export default function TabPaiements() {
   const [payments, setPayments] = useState([])
@@ -102,7 +104,6 @@ export default function TabPaiements() {
 
   const filtered = filter === 'all' ? payments : payments.filter(p => p.status === filter)
 
-  // KPI list with colors (computed, used in map with const sKpiVal)
   const kpiList = [
     { label: 'Total ce mois',  value: `${kpis.thisMonth.toLocaleString('fr-TN')} DT`, color: '#F59E0B' },
     { label: 'Total cumulé',   value: `${kpis.total.toLocaleString('fr-TN')} DT`,     color: '#6366F1' },
@@ -131,16 +132,14 @@ export default function TabPaiements() {
     .adm-pay-export { display:flex; align-items:center; gap:6px; padding:6px 14px; border-radius:9px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:var(--tx-2); font-size:11px; font-weight:600; cursor:pointer; transition:all 150ms; }
     .adm-pay-export:hover { background:rgba(99,102,241,0.1); color:var(--tx); }
     .adm-pay-table { background:rgba(13,17,32,0.7); border:1px solid rgba(255,255,255,0.07); border-radius:14px; overflow:hidden; backdrop-filter:blur(10px); }
-    .adm-pay-table-head { display:grid; grid-template-columns:90px 1fr 1fr 100px 100px 100px; padding:10px 16px; border-bottom:1px solid rgba(255,255,255,0.07); font-size:10px; font-weight:700; color:var(--tx-3); letter-spacing:.06em; text-transform:uppercase; }
-    .adm-pay-row { display:grid; grid-template-columns:90px 1fr 1fr 100px 100px 100px; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,0.04); align-items:center; transition:background 150ms; }
+    .adm-pay-table-head { display:grid; grid-template-columns:90px 130px 1fr 100px 100px 100px; padding:10px 16px; border-bottom:1px solid rgba(255,255,255,0.07); font-size:10px; font-weight:700; color:var(--tx-3); letter-spacing:.06em; text-transform:uppercase; }
+    .adm-pay-row { display:grid; grid-template-columns:90px 130px 1fr 100px 100px 100px; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,0.04); align-items:center; transition:background 150ms; }
     .adm-pay-row:last-child { border-bottom:none; }
     .adm-pay-row:hover { background:rgba(255,255,255,0.03); }
     .adm-pay-date { font-size:11px; color:var(--tx-3); font-family:'JetBrains Mono',monospace; }
-    .adm-pay-client { font-size:12px; font-weight:600; color:var(--tx); }
-    .adm-pay-desc { font-size:11px; color:var(--tx-3); margin-top:2px; }
-    .adm-pay-amount { font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--gold); }
+    .adm-pay-client { font-size:12px; font-weight:600; color:var(--tx); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .adm-pay-status { display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:20px; font-size:10px; font-weight:700; }
-    @media(max-width:768px){ .adm-pay-table-head { display:none; } .adm-pay-row { grid-template-columns:1fr auto; } }
+    @media(max-width:768px){ .adm-pay-table-head { display:none; } .adm-pay-row { grid-template-columns:1fr auto; gap:6px; } }
   `
 
   return (
@@ -174,9 +173,14 @@ export default function TabPaiements() {
         </div>
 
         <div className="adm-pay-table">
+          {/* ✅ En-tête : 6 colonnes — Date | Client | Description | Méthode | Montant | Statut */}
           <div className="adm-pay-table-head">
-            <span>Date</span><span>Client</span><span>Description</span>
-            <span>Méthode</span><span>Montant</span><span>Statut</span>
+            <span>Date</span>
+            <span>Client</span>
+            <span>Description</span>
+            <span>Méthode</span>
+            <span>Montant</span>
+            <span>Statut</span>
           </div>
           {loading ? (
             <div style={sEmpty}>Chargement…</div>
@@ -189,13 +193,22 @@ export default function TabPaiements() {
             const sStatus = { background: s.bg, color: s.color }
             return (
               <div key={p.id} className="adm-pay-row">
+                {/* Col 1 — Date */}
                 <span className="adm-pay-date">{p.date}</span>
-                <div>
-                  <div className="adm-pay-client">{p.client_name}</div>
-                  {p.description && <div className="adm-pay-desc">{p.description}</div>}
-                </div>
-                <div style={sMethodCol}>{m ? <>{m.emoji} {m.label}</> : '—'}</div>
-                <div className="adm-pay-amount">{p.amount?.toLocaleString('fr-TN')} DT</div>
+
+                {/* Col 2 — Client */}
+                <div className="adm-pay-client">{p.client_name}</div>
+
+                {/* ✅ Col 3 — Description (fix: cellule séparée, ne fusionne plus avec client) */}
+                <div style={sDescTxt}>{p.description || '—'}</div>
+
+                {/* ✅ Col 4 — Méthode (fix: était décalée en col 3 avant) */}
+                <div style={sMethodTxt}>{m ? <>{m.emoji} {m.label}</> : '—'}</div>
+
+                {/* ✅ Col 5 — Montant (fix: était décalé en col 4) */}
+                <div style={sAmountTxt}>{p.amount != null ? p.amount.toLocaleString('fr-TN') + ' DT' : '—'}</div>
+
+                {/* ✅ Col 6 — Statut (fix: était vide avant — col 5 affichait le statut) */}
                 <div className="adm-pay-status" style={sStatus}>
                   <SIcon size={10} />{s.label}
                 </div>
