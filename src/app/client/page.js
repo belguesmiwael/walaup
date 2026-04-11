@@ -409,26 +409,29 @@ export default function ClientPage() {
   }, [router, loadLeads])
 
   // ── Realtime : met à jour tous les leads du client sans filtre DB (plus fiable) ✅
-  useEffect(() => {
-    if (!session?.user?.id) return
-    const channel = supabase
-      .channel(`client-leads-rt-${session.user.id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'leads' }, (payload) => {
-        if (!payload.new) return
-        const updated = payload.new
-        // Filtre côté client : on ne met à jour que nos propres leads
-        setLeads(prev => {
-          const idx = prev.findIndex(l => l.id === updated.id)
-          if (idx === -1) return prev  // pas notre lead, on ignore
-          const next = [...prev]
-          next[idx] = updated
-          return next
-        })
-        setLead(prev => prev?.id === updated.id ? updated : prev)
+ useEffect(() => {
+  if (!session?.user?.id) return
+  const channel = supabase
+    .channel(`client-leads-rt-${session.user.id}`)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'leads' }, (payload) => {
+      if (!payload.new) return
+      const updated = payload.new
+      setLeads(prev => {
+        const idx = prev.findIndex(l => l.id === updated.id)
+        if (idx === -1) return prev
+        const next = [...prev]
+        next[idx] = updated
+        return next
       })
-      .subscribe()
-    return () => supabase.removeChannel(channel)
-  }, [session?.user?.id])
+      setLead(prev => prev?.id === updated.id ? updated : prev)
+    })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'leads' }, (payload) => {
+      // Nouveau lead — recharge tout pour appliquer le filtre email correctement
+      if (session?.user?.id) loadLeads()
+    })
+    .subscribe()
+  return () => supabase.removeChannel(channel)
+}, [session?.user?.id, loadLeads])
 
   // ── Unread messages (polling 10s)
   useEffect(() => {
