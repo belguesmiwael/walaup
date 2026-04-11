@@ -378,41 +378,28 @@ export default function ClientPage() {
   }, [])
 
   // ── Charge TOUS les leads du client (multi-projets) ✅
-  const loadLeads = useCallback(async (userId) => {
-    // 1. Cherche par user_id
-    const { data: byUserId } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
+  const loadLeads = useCallback(async () => {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user?.email) return
 
-    if (byUserId && byUserId.length > 0) {
-      setLeads(byUserId)
-      setLead(byUserId[0])
-      return
-    }
+  const { data, error } = await supabase
+    .from('leads')
+    .select('*')
+    .ilike('email', user.email)
+    .order('created_at', { ascending: false })
 
-    // 2. Fallback par email
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user?.email) {
-      const { data: byEmail } = await supabase
-        .from('leads')
-        .select('*')
-        .ilike('email', user.email)
-        .order('created_at', { ascending: false })
-      if (byEmail && byEmail.length > 0) {
-        setLeads(byEmail)
-        setLead(byEmail[0])
-      }
-    }
-  }, [])
+  if (!error && data && data.length > 0) {
+    setLeads(data)
+    setLead(data[0])
+  }
+}, [])
 
   // ── Auth
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       if (!session) { router.push('/login'); return }
-      loadLeads(session.user.id).finally(() => setLoading(false))
+      loadLeads().finally(() => setLoading(false))
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
       setSession(s)
