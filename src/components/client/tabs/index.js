@@ -421,10 +421,11 @@ useEffect(() => {
     // Ajout depuis table payments
     payments.forEach(p => {
       const statusMap = {
-        pending:   { color: '#FB923C', bg: 'rgba(251,146,60,.1)',  label: '⏳ En attente',    icon: Clock },
-        confirmed: { color: '#10B981', bg: 'rgba(16,185,129,.1)',  label: '✅ Confirmé',       icon: CheckCircle2 },
-        failed:    { color: '#F87171', bg: 'rgba(248,113,113,.1)', label: '❌ Échoué',          icon: XCircle },
-      }
+  pending:   { color: '#FB923C', bg: 'rgba(251,146,60,.1)',  label: '⏳ En attente', icon: Clock },
+  confirmed: { color: '#10B981', bg: 'rgba(16,185,129,.1)',  label: '✅ Confirmé',   icon: CheckCircle2 },
+  completed: { color: '#10B981', bg: 'rgba(16,185,129,.1)',  label: '✅ Confirmé',   icon: CheckCircle2 },
+  failed:    { color: '#F87171', bg: 'rgba(248,113,113,.1)', label: '❌ Échoué',     icon: XCircle },
+}
       const s = statusMap[p.status] || statusMap.pending
       const typeLabel = {
         annual: '🔄 Pack annuel',
