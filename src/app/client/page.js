@@ -14,7 +14,10 @@ import { TabAbonnement, TabPaiements, TabApps } from '@/components/client/tabs'
 const CSS = `
   /* ── Root layout ── */
   .cl-root {
-    height: 100dvh;
+    position: fixed;
+    top: 0; left: 0;
+    right: 0; bottom: 0;
+    z-index: 1000;
     display: flex;
     flex-direction: column;
     background: var(--bg-base);
@@ -317,6 +320,19 @@ export default function ClientPage() {
     if (activeTab === 'messages') setUnreadMsg(0)
   }, [activeTab])
 
+  // Cache navbar/footer du root layout
+  useEffect(() => {
+    const toHide = [
+      ...document.querySelectorAll('nav'),
+      ...document.querySelectorAll('header'),
+      ...document.querySelectorAll('footer'),
+    ]
+    toHide.forEach(el => el.style.setProperty('display', 'none', 'important'))
+    return () => {
+      toHide.forEach(el => el.style.removeProperty('display'))
+    }
+  }, [])
+  
   const logout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
