@@ -2,305 +2,590 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import {
+  LayoutDashboard, MessageSquare, CreditCard,
+  Smartphone, Star, LogOut, Menu, X, ArrowLeft,
+  ChevronLeft, ChevronRight, PlusCircle
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { WalaupSound } from '@/lib/sound'
-import ClientSidebar from '@/components/client/ClientSidebar'
-import ClientBottomTabs from '@/components/client/ClientBottomTabs'
 import TabProjet from '@/components/client/tabs/TabProjet'
 import TabMessages from '@/components/client/tabs/TabMessages'
-import { TabAbonnement, TabPaiements, TabApps } from '@/components/client/tabs/index.js'
-import { LogOut, ArrowLeft, PlusCircle } from 'lucide-react'
+import { TabAbonnement, TabPaiements, TabApps } from '@/components/client/tabs'
 
+// ─── CSS ────────────────────────────────────────────────────────────────────────
 const CSS = `
+  /* ── Root layout ── */
   .cl-root {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    display: flex; flex-direction: column; overflow: hidden;
-    background: var(--bg-base); z-index: 1000;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-base);
+    overflow: hidden;
   }
 
-  /* ── Top bar mobile — logo only ── */
+  /* ── Top bar (mobile) ── */
   .cl-topbar {
-    display: none; align-items: center; justify-content: center;
-    height: 46px; flex-shrink: 0;
-    background: rgba(10,14,28,.92);
-    border-bottom: 1px solid rgba(255,255,255,.06);
-    backdrop-filter: blur(20px); position: relative; z-index: 20;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0 16px;
+    height: 48px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    background: rgba(8,11,20,0.9);
+    backdrop-filter: blur(14px);
+    flex-shrink: 0;
+    z-index: 100;
   }
   .cl-topbar-logo {
-    font-family: var(--font-display); font-size: 1.1rem; font-weight: 800;
-    background: linear-gradient(135deg, #6366F1, #8B5CF6);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 900;
+    font-size: 18px;
+    background: linear-gradient(135deg, var(--ac), var(--ac-2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
-  /* ── Body ── */
-  .cl-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
-  .cl-main {
-    flex: 1; min-width: 0; display: flex; flex-direction: column;
-    overflow: hidden; position: relative; z-index: 1;
+  /* ── Sidebar (desktop) ── */
+  .cl-sidebar {
+    flex-shrink: 0;
+    border-right: 1px solid rgba(255,255,255,0.07);
+    background: rgba(8,11,20,0.6);
+    backdrop-filter: blur(16px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width .26s cubic-bezier(0.16,1,0.3,1);
   }
-  .cl-scroll {
-    flex: 1; overflow-y: auto; padding: 28px 28px 40px;
-    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.08) transparent;
-  }
-  .cl-scroll::-webkit-scrollbar { width: 4px; }
-  .cl-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 4px; }
-  /* Messages tab : pas de padding, overflow hidden pour que la boite soit fixée en bas */
-  .cl-scroll--msgs { padding: 0 !important; overflow: hidden !important; display: flex; flex-direction: column; }
+  .cl-sidebar--open   { width: 240px; }
+  .cl-sidebar--closed { width: 60px; }
 
-  /* ── Bouton nouvelle app (desktop flottant) ── */
+  /* Sidebar header (logo + toggle) */
+  .cl-sb-header {
+    display: flex;
+    align-items: center;
+    padding: 16px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+    gap: 8px;
+    min-height: 58px;
+  }
+  .cl-sidebar-logo {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 900;
+    font-size: 20px;
+    background: linear-gradient(135deg, var(--ac), var(--ac-2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    white-space: nowrap;
+    flex: 1;
+    overflow: hidden;
+    opacity: 0;
+    max-width: 0;
+    transition: opacity .18s, max-width .26s cubic-bezier(0.16,1,0.3,1);
+  }
+  .cl-sidebar--open .cl-sidebar-logo { opacity: 1; max-width: 160px; }
+
+  /* Toggle always visible */
+  .cl-sb-toggle {
+    width: 32px; height: 32px; min-width: 32px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid rgba(99,102,241,0.3);
+    border-radius: 9px;
+    background: rgba(99,102,241,0.1);
+    cursor: pointer;
+    color: var(--ac);
+    transition: all .18s;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+  .cl-sb-toggle:hover { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.5); }
+  .cl-sidebar--closed .cl-sb-toggle { margin-left: 0; }
+
+  /* Nav scroll area */
+  .cl-sb-nav {
+    flex: 1;
+    padding: 10px 0;
+    overflow-y: auto;
+  }
+  .cl-nav-item {
+    display: flex; align-items: center; gap: 11px;
+    padding: 10px 12px;
+    border-radius: 11px;
+    margin: 2px 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--tx-3);
+    border: 1px solid transparent;
+    transition: all 0.18s;
+    position: relative;
+    font-family: 'Inter', sans-serif;
+    background: transparent;
+    text-align: left;
+    width: calc(100% - 16px);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .cl-sidebar--closed .cl-nav-item { justify-content: center; padding: 10px 0; }
+  .cl-nav-item:hover { background: rgba(255,255,255,0.05); color: var(--tx); }
+  .cl-nav-item--active {
+    background: rgba(99,102,241,0.12);
+    border-color: rgba(99,102,241,0.25);
+    color: var(--ac);
+  }
+  .cl-nav-label {
+    overflow: hidden; opacity: 0; max-width: 0;
+    transition: opacity .18s, max-width .26s cubic-bezier(0.16,1,0.3,1);
+  }
+  .cl-sidebar--open .cl-nav-label { opacity: 1; max-width: 160px; }
+  .cl-nav-badge {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    min-width: 18px; height: 18px; border-radius: 9px;
+    background: var(--red); color: #fff;
+    font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 4px;
+    opacity: 0; max-width: 0;
+    transition: opacity .18s, max-width .26s cubic-bezier(0.16,1,0.3,1);
+  }
+  .cl-sidebar--open .cl-nav-badge { opacity: 1; max-width: 40px; }
+  .cl-nav-dot {
+    position: absolute; top: 8px; right: 8px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--red);
+  }
+  .cl-nav-tooltip {
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%; transform: translateY(-50%);
+    background: rgba(8,11,20,.98);
+    border: 1px solid rgba(255,255,255,.12);
+    color: var(--tx); font-size: 12px; font-weight: 500;
+    padding: 5px 11px; border-radius: 8px;
+    white-space: nowrap;
+    opacity: 0; pointer-events: none;
+    transition: opacity .15s;
+    z-index: 300;
+    box-shadow: 0 4px 16px rgba(0,0,0,.5);
+  }
+  .cl-sidebar--closed .cl-nav-item:hover .cl-nav-tooltip { opacity: 1; }
+
+  /* Sidebar footer */
+  .cl-sidebar-footer {
+    padding: 8px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  /* User block */
+  .cl-user-block {
+    padding: 10px;
+    margin-bottom: 4px;
+    background: rgba(99,102,241,0.07);
+    border: 1px solid rgba(99,102,241,0.15);
+    border-radius: 10px;
+    overflow: hidden;
+    opacity: 0; max-width: 0;
+    transition: opacity .18s, max-width .26s cubic-bezier(0.16,1,0.3,1), padding .26s, margin .26s;
+  }
+  .cl-sidebar--open .cl-user-block { opacity: 1; max-width: 240px; }
+  .cl-user-name { font-size: 13px; font-weight: 700; color: var(--tx); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cl-user-pack {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 20px;
+    font-size: 10px; font-weight: 700;
+    background: rgba(99,102,241,0.15); color: var(--ac);
+    text-transform: capitalize;
+  }
+  /* Footer buttons */
+  .cl-sb-footer-btn {
+    display: flex; align-items: center; gap: 9px;
+    padding: 0 12px; height: 38px;
+    border-radius: 10px; cursor: pointer;
+    border: none; background: none;
+    font-family: 'Inter', sans-serif;
+    width: 100%; white-space: nowrap; overflow: hidden;
+    text-decoration: none;
+    transition: all .18s;
+    position: relative;
+  }
+  .cl-sidebar--closed .cl-sb-footer-btn { justify-content: center; padding: 0; }
+  .cl-sb-footer-label {
+    font-size: 12.5px; font-weight: 500;
+    opacity: 0; max-width: 0;
+    transition: opacity .18s, max-width .26s cubic-bezier(0.16,1,0.3,1);
+  }
+  .cl-sidebar--open .cl-sb-footer-label { opacity: 1; max-width: 160px; }
+  .cl-sb-footer-btn--back { color: var(--tx-3); }
+  .cl-sb-footer-btn--back:hover { background: rgba(255,255,255,.06); color: var(--tx-2); }
+  .cl-sb-footer-btn--logout { color: var(--tx-3); }
+  .cl-sb-footer-btn--logout:hover { background: rgba(248,113,113,.09); color: var(--red); }
+
+  /* ── Body (sidebar + content) ── */
+  .cl-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* ── Content area ── */
+  .cl-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    min-height: 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.08) transparent;
+  }
+  .cl-content::-webkit-scrollbar { width: 4px; }
+  .cl-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+  .cl-content--messages {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── FAB nouvelle app (tab Projet uniquement) ── */
   .cl-newapp-fab {
     position: fixed; bottom: 28px; right: 28px;
     display: flex; align-items: center; gap: 8px;
     padding: 11px 18px; border-radius: 50px;
     background: linear-gradient(135deg, #6366F1, #8B5CF6);
     color: #fff; font-size: 13px; font-weight: 700;
-    font-family: var(--font-body); text-decoration: none;
+    font-family: 'Inter', sans-serif; text-decoration: none;
     box-shadow: 0 6px 24px rgba(99,102,241,.4);
     transition: all .22s cubic-bezier(0.16,1,0.3,1);
     z-index: 50;
   }
   .cl-newapp-fab:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(99,102,241,.55); }
-  .cl-newapp-fab:active { transform: translateY(0); }
 
-  /* ── Aurora ── */
-  .cl-orb { position: fixed; border-radius: 50%; pointer-events: none; z-index: 0; }
-  .cl-orb--1 {
-    width: 700px; height: 700px; top: -280px; right: -220px;
-    background: radial-gradient(ellipse, rgba(99,102,241,.17) 0%, transparent 70%);
-    filter: blur(60px);
+  /* ── Mobile bottom nav ── */
+  .cl-bottom-nav {
+    display: none;
+    flex-shrink: 0;
+    z-index: 100;
   }
-  .cl-orb--2 {
-    width: 550px; height: 550px; bottom: -220px; left: 50px;
-    background: radial-gradient(ellipse, rgba(139,92,246,.13) 0%, transparent 70%);
-    filter: blur(58px);
+  .cl-bottom-nav-inner {
+    display: flex;
+    height: 62px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    background: rgba(8,11,20,0.97);
+    backdrop-filter: blur(20px);
   }
-  .cl-orb--3 {
-    width: 350px; height: 350px; top: 40%; left: 30%;
-    background: radial-gradient(ellipse, rgba(245,158,11,.07) 0%, transparent 70%);
-    filter: blur(55px);
+  /* Util buttons (retour + logout) */
+  .cl-bottom-util {
+    width: 46px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border: none; background: none;
+    text-decoration: none;
+    transition: all .18s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cl-bottom-util--back { color: var(--tx-3); border-right: 1px solid rgba(255,255,255,.06); }
+  .cl-bottom-util--back:hover { color: var(--tx-2); background: rgba(255,255,255,.04); }
+  .cl-bottom-util--logout { color: var(--tx-3); border-left: 1px solid rgba(255,255,255,.06); }
+  .cl-bottom-util--logout:hover { color: var(--red); background: rgba(248,113,113,.07); }
+  /* Tab buttons */
+  .cl-bottom-tabs { flex: 1; display: flex; }
+  .cl-bottom-tab {
+    flex: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 3px; cursor: pointer;
+    font-size: 9px; font-weight: 600;
+    color: var(--tx-3);
+    border: none; background: transparent;
+    font-family: 'Inter', sans-serif;
+    position: relative;
+    transition: color 0.18s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cl-bottom-tab--active { color: var(--ac); }
+  .cl-bottom-tab::before {
+    content: '';
+    position: absolute; top: 0; left: 20%; right: 20%;
+    height: 2px; background: var(--ac);
+    border-radius: 0 0 3px 3px;
+    transform: scaleX(0);
+    transition: transform .22s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .cl-bottom-tab--active::before { transform: scaleX(1); }
+  .cl-bottom-badge {
+    position: absolute;
+    top: 6px; right: calc(50% - 18px);
+    min-width: 15px; height: 15px; border-radius: 8px;
+    background: var(--red); color: #fff;
+    font-size: 9px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 3px;
+  }
+
+  /* ── Mobile drawer overlay ── */
+  .cl-drawer-ov {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 200; backdrop-filter: blur(4px);
+  }
+  .cl-drawer {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 260px;
+    background: rgba(8,11,20,0.98);
+    border-right: 1px solid rgba(255,255,255,0.1);
+    padding: 20px 0;
+    overflow-y: auto;
+    display: flex; flex-direction: column;
   }
 
   /* ── Responsive ── */
-  @media (max-width: 767px) {
-    .cl-topbar       { display: flex; }
-    .cl-sidebar-wrap { display: none; }
-    .cl-scroll       { padding: 20px 16px 80px; }
-    .cl-scroll--msgs  { padding: 0 !important; }
-    .cl-topbar        { display: flex; }
-    .cl-newapp-fab   { bottom: 76px; right: 16px; padding: 10px 14px; font-size: 12px; }
-  }
-  @media (min-width: 768px) {
-    .cl-bottomtabs-wrap { display: none; }
-  }
-
-  /* ── Loading ── */
-  @keyframes cl-spin { to { transform: rotate(360deg); } }
-  .cl-loading {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    display: flex; flex-direction: column; align-items: center;
-    justify-content: center; background: var(--bg-base); gap: 14px; z-index: 1000;
-  }
-  .cl-spinner {
-    width: 38px; height: 38px;
-    border: 2px solid rgba(99,102,241,.18); border-top-color: #6366F1;
-    border-radius: 50%; animation: cl-spin .85s linear infinite;
+  @media (max-width: 768px) {
+    .cl-topbar     { display: flex; }
+    .cl-sidebar    { display: none !important; }
+    .cl-bottom-nav { display: block; }
+    .cl-content    { padding: 16px 14px 80px; }
+    .cl-content--messages { padding: 0; }
+    .cl-newapp-fab { bottom: 74px; right: 14px; padding: 10px 14px; font-size: 12px; }
   }
 `
 
-const sLoadingTxt = { color: 'var(--tx-3)', fontSize: 13 }
-
-function LoadingScreen() {
-  return (
-    <>
-      <style>{CSS}</style>
-      <div className="cl-loading">
-        <div className="cl-spinner" />
-        <p style={sLoadingTxt}>Chargement de votre espace...</p>
-      </div>
-    </>
-  )
-}
+const TABS = [
+  { id: 'projet',     label: 'Projet',     icon: LayoutDashboard },
+  { id: 'messages',   label: 'Messages',   icon: MessageSquare, hasBadge: true },
+  { id: 'paiements',  label: 'Paiements',  icon: CreditCard     },
+  { id: 'apps',       label: 'Mes Apps',   icon: Smartphone     },
+  { id: 'abonnement', label: 'Abonn.',     icon: Star           },
+]
 
 export default function ClientPage() {
   const router = useRouter()
   const [session, setSession] = useState(null)
   const [lead, setLead] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('projet')
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [unread, setUnread] = useState(0)
+  const [unreadMsg, setUnreadMsg] = useState(0)
+  const [loading, setLoading] = useState(true)
 
-  // ── Fullscreen — hide navbar + footer ───────────────────────────────────
-  useEffect(() => {
-    const toHide = [
-      ...document.querySelectorAll('nav'),
-      ...document.querySelectorAll('header'),
-      ...document.querySelectorAll('footer'),
-    ]
-    toHide.forEach(el => {
-      el.dataset.clHidden = el.style.display
-      el.style.setProperty('display', 'none', 'important')
-    })
-    return () => {
-      toHide.forEach(el => {
-        el.style.removeProperty('display')
-        delete el.dataset.clHidden
-      })
-    }
-  }, [])
-
-  // ── Realtime unread count ────────────────────────────────────────────────
-  const listenUnread = useCallback((leadId) => {
-    const ch = supabase
-      .channel(`cl-unread-${leadId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `lead_id=eq.${leadId}` },
-        async (payload) => {
-          if (payload.new.sender !== 'admin') return
-          // Ne compter que si l'onglet messages n'est pas actif
-          setUnread(prev => prev + 1)
-        }
-      )
-      .subscribe()
-    return ch
-  }, [])
-
-  // ── Init ─────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    let unreadChannel = null
-
-    async function init() {
-      try {
-        const { data: { session: s }, error } = await supabase.auth.getSession()
-        if (error || !s) { router.push('/login'); return }
-        setSession(s)
-
-        const { data: leads, error: leadErr } = await supabase
-          .from('leads')
-          .select('*')
-          .eq('email', s.user.email)
-          .order('created_at', { ascending: false })
-          .limit(1)
-
-        if (!leadErr && leads && leads.length > 0) {
-          const l = leads[0]
-          setLead(l)
-          const { count } = await supabase
-            .from('messages')
-            .select('id', { count: 'exact', head: true })
-            .eq('lead_id', l.id)
-            .eq('sender', 'admin')
-            .eq('is_read', false)
-          setUnread(count || 0)
-          unreadChannel = listenUnread(l.id)
-        }
-      } catch (err) {
-        console.error('[ClientPage] init error', err)
-        router.push('/login')
-      } finally {
-        setLoading(false)
+  // ── Auth + lead ──────────────────────────────────────────────────────────────────────
+const loadLead = useCallback(async (userId) => {
+    const { data } = await supabase.from('leads').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    if (!data) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user?.email) {
+        const { data: byEmail } = await supabase.from('leads').select('*').ilike('email', user.email).order('created_at', { ascending: false }).limit(1).maybeSingle()
+        if (byEmail) setLead(byEmail)
       }
+    } else {
+      setLead(data)
     }
+  }, [])
 
-    init()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
-      if (event === 'SIGNED_OUT' || !s) router.push('/login')
-    })
-
-    return () => {
-      subscription.unsubscribe()
-      if (unreadChannel) supabase.removeChannel(unreadChannel)
-    }
-  }, [router, listenUnread])
-
-  // ── Clear unread quand on ouvre l'onglet messages ────────────────────────
   useEffect(() => {
-    if (activeTab === 'messages' && lead?.id && unread > 0) {
-      supabase
-        .from('messages')
-        .update({ is_read: true })
-        .eq('lead_id', lead.id)
-        .eq('sender', 'admin')
-        .then(() => setUnread(0))
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      if (!session) { router.push('/login'); return }
+      loadLead(session.user.id).finally(() => setLoading(false))
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
+      setSession(s)
+      if (!s) router.push('/login')
+    })
+    return () => subscription.unsubscribe()
+  }, [router, loadLead])
+
+  // ── Unread messages (polling 10s) ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!lead?.id || activeTab === 'messages') return
+    const check = async () => {
+      const { count } = await supabase.from('messages').select('id', { count: 'exact', head: true })
+        .eq('lead_id', lead.id).eq('sender', 'admin').eq('is_read', false)
+      setUnreadMsg(count || 0)
     }
-  }, [activeTab, lead?.id, unread])
+    check()
+    const t = setInterval(check, 10000)
+    return () => clearInterval(t)
+  }, [lead?.id, activeTab])
 
-  function handleTabChange(tab) {
-    WalaupSound.tab()
-    setActiveTab(tab)
+  useEffect(() => { if (activeTab === 'messages') setUnreadMsg(0) }, [activeTab])
+
+  const logout = async () => { await supabase.auth.signOut(); router.push('/') }
+
+  const switchTab = (id) => {
+    setActiveTab(id)
+    setDrawerOpen(false)
+    if (id === 'messages') setUnreadMsg(0)
   }
 
-  function handleLogout() {
-    WalaupSound.click()
-    supabase.auth.signOut().then(() => router.push('/'))
+  const sbCls = sidebarOpen ? 'cl-sidebar cl-sidebar--open' : 'cl-sidebar cl-sidebar--closed'
+
+  const sLoadWrap  = { height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-base)' }
+  const sLoadSpinner = { width: 32, height: 32, border: '2px solid rgba(99,102,241,.2)', borderTopColor: 'var(--ac)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }
+
+  if (loading) {
+    return (
+      <div style={sLoadWrap}>
+        <div style={sLoadSpinner} />
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    )
   }
 
-  if (loading) return <LoadingScreen />
+  const sBadgeDrawer  = { position: 'static', transform: 'none', marginLeft: 'auto', opacity: 1, maxWidth: 40 }
+  const sDrawerLogo   = { padding: '0 18px 16px', borderBottom: '1px solid rgba(255,255,255,.06)', marginBottom: 10 }
+  const sDrawerUser   = { margin: '0 10px 12px', padding: '10px 14px', background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 12 }
+  const sDrawerFooter = { marginTop: 'auto', padding: '12px 10px 0', borderTop: '1px solid rgba(255,255,255,.06)', display: 'flex', flexDirection: 'column', gap: 4 }
+  const sDrawerBack   = { display: 'flex', alignItems: 'center', gap: 9, padding: '9px 14px', borderRadius: 10, color: 'var(--tx-3)', textDecoration: 'none', fontSize: 12, fontWeight: 600, fontFamily: 'Inter, sans-serif' }
+  const sDrawerLogout = { display: 'flex', alignItems: 'center', gap: 9, padding: '9px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.15)', color: '#F87171', cursor: 'pointer', fontSize: 12, fontWeight: 600, width: '100%', fontFamily: 'Inter, sans-serif' }
 
-  const sharedProps = { lead, session, setLead }
-  const TABS = {
-    projet:     <TabProjet     {...sharedProps} />,
-    messages:   <TabMessages   {...sharedProps} />,
-    abonnement: <TabAbonnement {...sharedProps} />,
-    paiements:  <TabPaiements  {...sharedProps} />,
-    apps:       <TabApps       {...sharedProps} />,
-  }
+  // Nav items réutilisables (sidebar + drawer)
+  const NavItems = ({ inDrawer = false }) => (
+    <>
+      {TABS.map(tab => {
+        const Icon = tab.icon
+        const isActive = activeTab === tab.id
+        const badge = tab.hasBadge && unreadMsg > 0 ? unreadMsg : 0
+        return (
+          <button
+            key={tab.id}
+            className={`cl-nav-item${isActive ? ' cl-nav-item--active' : ''}`}
+            onClick={() => switchTab(tab.id)}>
+            <Icon size={17} />
+            {inDrawer
+              ? tab.id === 'messages' ? 'Messages' : tab.label  // toujours visible dans drawer
+              : <span className="cl-nav-label">{tab.label}</span>
+            }
+            {badge > 0 && (
+              inDrawer
+                ? <span className="cl-nav-badge" style={sBadgeDrawer}>{badge}</span>
+                : <><span className="cl-nav-badge">{badge}</span><span className="cl-nav-dot" /></>
+            )}
+            {!inDrawer && <span className="cl-nav-tooltip">{tab.label}</span>}
+          </button>
+        )
+      })}
+    </>
+  )
 
   return (
     <>
       <style>{CSS}</style>
-
-      {/* Aurora */}
-      <div className="cl-orb cl-orb--1" />
-      <div className="cl-orb cl-orb--2" />
-      <div className="cl-orb cl-orb--3" />
-
       <div className="cl-root">
 
-        {/* ── Mobile top bar — logo uniquement ── */}
+        {/* ── Mobile topbar — logo uniquement ── */}
         <div className="cl-topbar">
           <span className="cl-topbar-logo">Walaup</span>
         </div>
 
-        <div className="cl-body">
-          {/* Desktop sidebar */}
-          <div className="cl-sidebar-wrap">
-            <ClientSidebar
-              activeTab={activeTab}
-              onTabChange={handleTabChange}
-              open={sidebarOpen}
-              onToggle={() => setSidebarOpen(v => !v)}
-              session={session}
-              lead={lead}
-              onLogout={handleLogout}
-              unread={unread}
-            />
-          </div>
-
-          <main className="cl-main">
-            <div className={`cl-scroll${activeTab === 'messages' ? ' cl-scroll--msgs' : ''}`}>
-              {TABS[activeTab]}
+        {/* ── Mobile drawer overlay ── */}
+        {drawerOpen && (
+          <div className="cl-drawer-ov" onClick={() => setDrawerOpen(false)}>
+            <div className="cl-drawer" onClick={e => e.stopPropagation()}>
+              <div className="cl-sidebar-logo" style={sDrawerLogo}>Walaup</div>
+              {lead && (
+                <div style={sDrawerUser}>
+                  <div className="cl-user-name">{lead.name}</div>
+                  {lead.pack && <span className="cl-user-pack">Pack {lead.pack}</span>}
+                </div>
+              )}
+              <NavItems inDrawer />
+              <div style={sDrawerFooter}>
+                <Link href="/" style={sDrawerBack}>
+                  <ArrowLeft size={14} /> Retour accueil
+                </Link>
+                <button style={sDrawerLogout} onClick={logout}>
+                  <LogOut size={14} /> Se déconnecter
+                </button>
+              </div>
             </div>
+          </div>
+        )}
+
+        {/* ── Body ── */}
+        <div className="cl-body">
+
+          {/* Desktop sidebar */}
+          <aside className={sbCls}>
+            <div className="cl-sb-header">
+              <span className="cl-sidebar-logo">Walaup</span>
+              <button className="cl-sb-toggle" onClick={() => setSidebarOpen(v => !v)} aria-label={sidebarOpen ? 'Fermer' : 'Ouvrir'}>
+                {sidebarOpen ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
+              </button>
+            </div>
+            <div className="cl-sb-nav">
+              <NavItems />
+            </div>
+            <div className="cl-sidebar-footer">
+              {lead && (
+                <div className="cl-user-block">
+                  <div className="cl-user-name">{lead.name}</div>
+                  {lead.pack && <span className="cl-user-pack">Pack {lead.pack}</span>}
+                </div>
+              )}
+              <Link href="/" className="cl-sb-footer-btn cl-sb-footer-btn--back">
+                <ArrowLeft size={15} />
+                <span className="cl-sb-footer-label">Retour accueil</span>
+                <span className="cl-nav-tooltip">Retour accueil</span>
+              </Link>
+              <button className="cl-sb-footer-btn cl-sb-footer-btn--logout" onClick={logout}>
+                <LogOut size={15} />
+                <span className="cl-sb-footer-label">Déconnexion</span>
+                <span className="cl-nav-tooltip">Déconnexion</span>
+              </button>
+            </div>
+          </aside>
+
+          {/* Content */}
+          <main className={`cl-content${activeTab === 'messages' ? ' cl-content--messages' : ''}`}>
+            {activeTab === 'projet'     && <TabProjet     lead={lead} session={session} setLead={setLead} />}
+            {activeTab === 'messages'   && <TabMessages   lead={lead} session={session} isActive={activeTab === 'messages'} onUnreadChange={setUnreadMsg} />}
+            {activeTab === 'paiements'  && <TabPaiements  lead={lead} />}
+            {activeTab === 'apps'       && <TabApps       lead={lead} />}
+            {activeTab === 'abonnement' && <TabAbonnement lead={lead} setLead={setLead} />}
           </main>
         </div>
 
-        {/* Mobile bottom tabs */}
-        <div className="cl-bottomtabs-wrap">
-          <ClientBottomTabs
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-            unread={unread}
-            onLogout={handleLogout}
-          />
-        </div>
+        {/* ── Mobile bottom nav ── */}
+        <nav className="cl-bottom-nav">
+          <div className="cl-bottom-nav-inner">
+            {/* Retour accueil */}
+            <a href="/" className="cl-bottom-util cl-bottom-util--back" aria-label="Accueil">
+              <ArrowLeft size={18} />
+            </a>
+            {/* 5 tabs */}
+            <div className="cl-bottom-tabs">
+              {TABS.map(tab => {
+                const Icon = tab.icon
+                const isActive = activeTab === tab.id
+                const badge = tab.hasBadge && unreadMsg > 0 ? unreadMsg : 0
+                return (
+                  <button
+                    key={tab.id}
+                    className={`cl-bottom-tab${isActive ? ' cl-bottom-tab--active' : ''}`}
+                    onClick={() => switchTab(tab.id)}>
+                    {badge > 0 && <span className="cl-bottom-badge">{badge}</span>}
+                    <Icon size={18} strokeWidth={isActive ? 2.2 : 1.8} />
+                    <span>{tab.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {/* Déconnecter */}
+            <button className="cl-bottom-util cl-bottom-util--logout" aria-label="Déconnecter" onClick={logout}>
+              <LogOut size={17} />
+            </button>
+          </div>
+        </nav>
 
-        {/* ── FAB Nouvelle app — seulement sur tab Projet ── */}
+        {/* FAB nouvelle app — tab Projet uniquement */}
         {activeTab === 'projet' && (
-          <Link href="/estimateur" className="cl-newapp-fab" onClick={() => WalaupSound.click()}>
-            <PlusCircle size={16} /> Nouvelle app
+          <Link href="/estimateur" className="cl-newapp-fab">
+            <PlusCircle size={15} /> Nouvelle app
           </Link>
         )}
 
