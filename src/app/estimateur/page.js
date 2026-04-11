@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { WalaupSound } from '@/lib/sound'
 import {
@@ -745,7 +746,7 @@ function SuccessScreen({ name, sector, pack }) {
       </div>
       <div style={sBtns}>
         <a href="/" style={sBtnBack}><ChevronLeft size={14} />Retour</a>
-        <a href="/marketplace" style={sBtnMk}>Explorer le marketplace<ChevronRight size={14} /></a>
+        <a href="/login" style={sBtnMk}>Accéder à mon espace <ChevronRight size={14} /></a>
       </div>
     </div>
   )
@@ -754,6 +755,7 @@ function SuccessScreen({ name, sector, pack }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function EstimateurPage() {
+  const router = useRouter()
   const [step,       setStep]       = useState(1)
   const [animating,  setAnimating]  = useState(false)
   const [submitted,  setSubmitted]  = useState(false)
@@ -863,6 +865,8 @@ export default function EstimateurPage() {
 
       WalaupSound && WalaupSound.success && WalaupSound.success()
       setSubmitted(true)
+      // Redirection automatique vers l'espace client après 3.5s
+      setTimeout(() => router.push('/login'), 3500)
     } catch(e) {
       console.error(e)
       WalaupSound && WalaupSound.error && WalaupSound.error()
