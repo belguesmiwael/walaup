@@ -235,13 +235,9 @@ export default function AdminPage() {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (session) {
-          const { data } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', session.user.id)
-            .maybeSingle()
-          if (data?.role === 'super_admin') setAuthed(true)
-        }
+         const jwt = JSON.parse(atob(session.access_token.split('.')[1]))
+          if (jwt.role === 'super_admin') setAuthed(true)
+   }
       } catch (_) {}
       setLoading(false)
     }
@@ -263,12 +259,8 @@ export default function AdminPage() {
         setLoginLoading(false)
         return
       }
-      const { data: userData } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', data.user.id)
-        .maybeSingle()
-      if (userData?.role !== 'super_admin') {
+      const jwt = JSON.parse(atob(data.session.access_token.split('.')[1]))
+      if (jwt.role !== 'super_admin') {
         setLoginErr('Accès refusé — compte non autorisé.')
         await supabase.auth.signOut()
       } else {
