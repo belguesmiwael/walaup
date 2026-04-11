@@ -369,16 +369,12 @@ function DemoPanel({ lead, onRefresh }) {
       .select()  // ✅ retourne les lignes mises à jour pour confirmer
 
     if (error) {
-      console.error('[deliverFinal] RLS ou DB error:', error)
-      alert('❌ Erreur livraison : ' + error.message + '\n\nVérifiez les RLS policies sur la table leads (UPDATE pour super_admin).')
+      console.error('[deliverFinal] error:', error.message)
       setSaving(false)
       return
     }
-
-    // Vérification que l\'UPDATE a bien touché une ligne
     if (!updatedRows || updatedRows.length === 0) {
-      console.warn('[deliverFinal] Aucune ligne mise à jour — RLS silencieuse?', { leadId: lead.id })
-      alert('⚠️ La livraison a échoué silencieusement. Vérifiez la RLS policy UPDATE sur la table leads pour les super_admin.')
+      console.warn('[deliverFinal] Aucune ligne mise à jour — RLS?', { leadId: lead.id })
       setSaving(false)
       return
     }
