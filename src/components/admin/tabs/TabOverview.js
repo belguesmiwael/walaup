@@ -1,18 +1,22 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { TrendingUp, Users, CreditCard, Package, AlertTriangle, RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 export default function TabOverview() {
-  const [kpis, setKpis] = useState(null)
-  const [activity, setActivity] = useState([])
-  const [revenue, setRevenue] = useState([])
-  const [packDist, setPackDist] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [kpis, setKpis]           = useState(null)
+  const [activity, setActivity]   = useState([])
+  const [revenue, setRevenue]     = useState([])
+  const [packDist, setPackDist]   = useState([])
+  const [loading, setLoading]     = useState(true)    // true seulement au 1er chargement
+  const [refreshing, setRefreshing] = useState(false) // true lors des rafraîchissements suivants
   const [lastRefresh, setLastRefresh] = useState(null)
 
-  const fetchData = async () => {
-    setLoading(true)
+  // ✅ isInitial=true : affiche le loading plein écran (1ère fois uniquement)
+  // ✅ isInitial=false : rafraîchissement silencieux (pas d'overlay sombre)
+  const fetchData = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true)
+    else setRefreshing(true)
     try {
       const now = new Date()
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
@@ -26,22 +30,36 @@ export default function TabOverview() {
       ])
       const totalRevenue = (revenueRes.data || []).reduce((s, p) => s + (p.amount || 0), 0)
       setKpis([
-        { label: 'Leads ce mois',    value: leadsRes.count  || 0, unit: '',    color: '#6366F1', icon: Users },
-        { label: 'Revenus (DT)',     value: totalRevenue,         unit: ' DT', color: '#F59E0B', icon: CreditCard },
-        { label: 'Clients actifs',   value: clientsRes.count || 0, unit: '',   color: '#10B981', icon: TrendingUp },
-        { label: 'Apps en cours',    value: appsRes.count   || 0, unit: '',    color: '#22D3EE', icon: Package },
-        { label: 'Apps livrées',     value: subsRes.count   || 0, unit: '',    color: '#8B5CF6', icon: TrendingUp },
-        { label: 'Résiliations',     value: cancelRes.count || 0, unit: '',    color: '#F87171', icon: AlertTriangle },
+        { label: 'Leads ce mois',  value: leadsRes.count   || 0, unit: '',     color: '#6366F1', icon: Users        },
+        { label: 'Revenus (DT)',   value: totalRevenue,          unit: ' DT',  color: '#F59E0B', icon: CreditCard   },
+        { label: 'Clients actifs', value: clientsRes.count || 0, unit: '',     color: '#10B981', icon: TrendingUp   },
+        { label: 'Apps en cours',  value: appsRes.count    || 0, unit: '',     color: '#22D3EE', icon: Package      },
+        { label: 'Apps livrées',   value: subsRes.count    || 0, unit: '',     color: '#8B5CF6', icon: TrendingUp   },
+        { label: 'Résiliations',   value: cancelRes.count  || 0, unit: '',     color: '#F87171', icon: AlertTriangle },
       ])
-      const actRes = await supabase.from('messages').select('id, text, sender, created_at, leads(name, app)').order('created_at', { ascending: false }).limit(10)
+
+      // ✅ Fix : "app" remplacé par "type" (colonne réelle dans la table leads)
+      const actRes = await supabase
+        .from('messages')
+        .select('id, text, sender, created_at, leads(name, type)')
+        .order('created_at', { ascending: false })
+        .limit(10)
       if (actRes.data) {
         setActivity(actRes.data.map(m => ({
-          id: m.id, time: formatRelTime(m.created_at),
-          text: m.sender === 'client' ? `Message client — ${m.leads?.name || '?'} — "${m.text?.slice(0,60)}…"` : `Réponse admin — ${m.leads?.name || '?'}`,
+          id: m.id,
+          time: formatRelTime(m.created_at),
+          text: m.sender === 'client'
+            ? `Message client — ${m.leads?.name || '?'} — "${m.text?.slice(0, 60)}…"`
+            : `Réponse admin — ${m.leads?.name || '?'}`,
           color: m.sender === 'client' ? '#6366F1' : '#10B981',
         })))
       }
-      const revRes = await supabase.from('payments').select('amount, created_at, type').eq('status', 'completed').gte('created_at', new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString())
+
+      const revRes = await supabase
+        .from('payments')
+        .select('amount, created_at, type')
+        .eq('status', 'completed')
+        .gte('created_at', new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString())
       const months = Array.from({ length: 6 }, (_, i) => {
         const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)
         return { month: d.toLocaleString('fr-FR', { month: 'short' }), annual: 0, monthly: 0, key: `${d.getFullYear()}-${d.getMonth()}` }
@@ -52,6 +70,7 @@ export default function TabOverview() {
         if (m) { if (p.type === 'monthly') m.monthly += p.amount; else m.annual += p.amount }
       })
       setRevenue(months)
+
       const packRes = await supabase.from('leads').select('pack').not('pack', 'is', null)
       const counts = {};(packRes.data || []).forEach(l => { counts[l.pack] = (counts[l.pack] || 0) + 1 })
       const total = Object.values(counts).reduce((s, v) => s + v, 0) || 1
@@ -61,28 +80,32 @@ export default function TabOverview() {
         { label: 'Pack Partenaire', count: counts['Partenaire'] || 0, color: '#F59E0B', pct: Math.round(((counts['Partenaire'] || 0) / total) * 100) },
       ])
       setLastRefresh(new Date())
-    } catch (err) { console.error('TabOverview', err) }
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    fetchData()
-    const interval = setInterval(fetchData, 60000)
-    const ch = supabase.channel('admin-overview')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, fetchData)
-      .subscribe()
-    return () => { clearInterval(interval); supabase.removeChannel(ch) }
+    } catch (err) {
+      console.error('TabOverview fetchData error:', err)
+    }
+    if (isInitial) setLoading(false)
+    else setRefreshing(false)
   }, [])
 
-  // ─ Style constants (safe from Notion corruption) ─
-  const sRefreshIcon = loading ? { animation: 'spin 1s linear infinite' } : {}
-  const sChartsWrap  = { flex: 2 }
-  const sPackLabel   = { fontSize: 11, color: 'var(--tx-2)', width: 110 }
-  const sEmptyAct    = { fontSize: 12, color: 'var(--tx-3)', padding: '12px 0' }
-  const sSkel1       = { height: 28, width: '60%', marginBottom: 8 }
-  const sSkel2       = { height: 12, width: '80%' }
+  useEffect(() => {
+    fetchData(true)  // ✅ 1ère fois : loading plein écran
+    const interval = setInterval(() => fetchData(false), 60000)  // ✅ Refresh silencieux
+    const ch = supabase.channel('admin-overview')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' },    () => fetchData(false))  // ✅ Silencieux
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => fetchData(false))  // ✅ Silencieux
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => fetchData(false))  // ✅ Silencieux
+      .subscribe()
+    return () => { clearInterval(interval); supabase.removeChannel(ch) }
+  }, [fetchData])
+
+  // Style constants
+  const sRefreshIcon  = refreshing ? { animation: 'spin 1s linear infinite' } : {}
+  const sChartsWrap   = { flex: 2 }
+  const sPackLabel    = { fontSize: 11, color: 'var(--tx-2)', width: 110 }
+  const sEmptyAct     = { fontSize: 12, color: 'var(--tx-3)', padding: '12px 0' }
+  const sSkel1        = { height: 28, width: '60%', marginBottom: 8 }
+  const sSkel2        = { height: 12, width: '80%' }
+  const sRefreshingDot = refreshing ? { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--ac)' } : { display: 'none' }
 
   const CSS = `
     .adm-ov { padding:24px; overflow-y:auto; height:100%; }
@@ -124,19 +147,44 @@ export default function TabOverview() {
     .adm-refresh-btn:hover { background:rgba(99,102,241,0.1); color:var(--ac); }
     .adm-skeleton { background:linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.08) 50%,rgba(255,255,255,0.04) 75%); background-size:200% 100%; animation:adm-shimmer 1.5s infinite; border-radius:8px; }
     @keyframes adm-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
   `
 
   const max = revenue.length ? Math.max(...revenue.map(r => r.annual + r.monthly), 1) : 1
+
+  const sLoadWrap  = { padding: 40, textAlign: 'center', color: 'var(--tx-3)', fontSize: 13 }
+  const sLoadDots  = { display: 'flex', gap: 6, justifyContent: 'center' }
+  const sDot1      = { width: 6, height: 6, borderRadius: '50%', background: 'var(--ac)', display: 'inline-block', animation: 'adm-fade-in .6s ease-in-out infinite alternate' }
+  const sDot2      = { width: 6, height: 6, borderRadius: '50%', background: 'var(--ac)', display: 'inline-block', animation: 'adm-fade-in .6s ease-in-out .2s infinite alternate' }
+  const sDot3      = { width: 6, height: 6, borderRadius: '50%', background: 'var(--ac)', display: 'inline-block', animation: 'adm-fade-in .6s ease-in-out .4s infinite alternate' }
+
+  // ✅ Loading plein écran seulement au 1er chargement (loading=true ET kpis=null)
+  if (loading && !kpis) return (
+    <>
+      <style>{CSS}</style>
+      <div style={sLoadWrap}>
+        <div style={sLoadDots}>
+          <span style={sDot1} />
+          <span style={sDot2} />
+          <span style={sDot3} />
+        </div>
+      </div>
+    </>
+  )
 
   return (
     <>
       <style>{CSS}</style>
       <div className="adm-ov">
-        <div className="adm-ov-title">Vue d'ensemble</div>
+        <div className="adm-ov-title">Vue d&apos;ensemble</div>
         <div className="adm-ov-sub">
           Données en temps réel · Walaup Platform
           {lastRefresh && <span>· {lastRefresh.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>}
-          <button className="adm-refresh-btn" onClick={fetchData}>
+          {/* ✅ Indicateur de rafraîchissement silencieux (petit spinner sans overlay) */}
+          <span style={sRefreshingDot}>
+            <RefreshCw size={10} style={sRefreshIcon} /> Mise à jour…
+          </span>
+          <button className="adm-refresh-btn" onClick={() => fetchData(false)}>
             <RefreshCw size={11} style={sRefreshIcon} /> Actualiser
           </button>
         </div>
@@ -150,7 +198,7 @@ export default function TabOverview() {
               <div key={i} className="adm-kpi-card">
                 <div className="adm-kpi-head">
                   <div className="adm-kpi-icon" style={sIcon}>
-                    {k && <Icon size={16} color={k.color} strokeWidth={1.8} />}
+                    {k && <Icon size={16} color={k.color} />}
                   </div>
                 </div>
                 {k ? (
@@ -187,7 +235,7 @@ export default function TabOverview() {
                       <div className="adm-bar-seg" style={sSegAnn} />
                       <div className="adm-bar-seg" style={sSegMon} />
                     </div>
-                    <div className="adm-bar-month">{r.month}</div>
+                    <span className="adm-bar-month">{r.month}</span>
                   </div>
                 )
               })}
@@ -212,11 +260,11 @@ export default function TabOverview() {
         <div className="adm-bottom">
           <div className="adm-activity">
             <div className="adm-activity-title">Activité récente</div>
-            {activity.length === 0 && !loading && <div style={sEmptyAct}>Aucune activité récente.</div>}
+            {activity.length === 0 && <div style={sEmptyAct}>Aucune activité récente.</div>}
             {activity.map((a, i) => {
               const sDot = { background: a.color }
               return (
-                <div key={a.id || i} className="adm-act-item">
+                <div key={i} className="adm-act-item">
                   <div className="adm-act-dot" style={sDot} />
                   <span className="adm-act-text">{a.text}</span>
                   <span className="adm-act-time">{a.time}</span>
@@ -234,7 +282,7 @@ function formatRelTime(ts) {
   if (!ts) return ''
   const diff = Date.now() - new Date(ts).getTime()
   const m = Math.floor(diff / 60000)
-  if (m < 1) return 'À l\'instant'
+  if (m < 1) return 'A l\'instant'
   if (m < 60) return `Il y a ${m} min`
   const h = Math.floor(m / 60)
   if (h < 24) return `Il y a ${h}h`
