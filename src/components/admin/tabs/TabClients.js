@@ -354,6 +354,15 @@ function DemoPanel({ lead, onRefresh }) {
       lead_id: lead.id, sender: 'admin',
       text: '✅ Paiement confirmé ! Votre application est en cours de développement final. Merci pour votre confiance.'
     })
+    // ✅ Notification toast côté client
+    await supabase.from('notifications').insert({
+      target_role: 'client',
+      target_id: lead.id,
+      type: 'success',
+      title: '✅ Paiement confirmé',
+      body: `Votre paiement de ${payAmount} DT a été reçu. Le développement commence maintenant !`,
+      is_read: false,
+    })
     await onRefresh(); setSaving(false)
   }
 
@@ -391,6 +400,15 @@ function DemoPanel({ lead, onRefresh }) {
     await supabase.from('messages').insert({
       lead_id: lead.id, sender: 'admin',
       text: `🎉 Félicitations ! Votre application est prête et déployée : ${url}`
+    })
+    // ✅ Notification toast côté client
+    await supabase.from('notifications').insert({
+      target_role: 'client',
+      target_id: lead.id,
+      type: 'success',
+      title: '🎉 Application livrée !',
+      body: 'Votre application est prête. Accédez-y depuis "Mes Apps".',
+      is_read: false,
     })
     await onRefresh()
     setSaving(false)
