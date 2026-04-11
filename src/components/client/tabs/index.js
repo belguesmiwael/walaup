@@ -398,10 +398,18 @@ useEffect(() => {
   if (!lead?.id) return
   const channel = supabase
     .channel(`payments-rt-${lead.id}`)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payments' },
-      ({ new: p }) => { if (p.lead_id === lead.id) fetchPayments() })
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'payments' },
-      ({ new: p }) => { if (p.lead_id === lead.id) fetchPayments() })
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'payments',
+      filter: `lead_id=eq.${lead.id}`
+    }, () => { fetchPayments() })
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'payments',
+      filter: `lead_id=eq.${lead.id}`
+    }, () => { fetchPayments() })
     .subscribe()
   return () => supabase.removeChannel(channel)
 }, [lead?.id, fetchPayments])
