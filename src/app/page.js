@@ -442,12 +442,25 @@ export default function Home() {
         @keyframes lp-shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(160%)} }
         @keyframes lp-overlay-in { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
 
+        /* Scroll horizontal container */
+        .lp-mk-scroll {
+          display:flex; gap:18px;
+          overflow-x:auto; scroll-snap-type:x mandatory;
+          -webkit-overflow-scrolling:touch;
+          padding:8px 4px 20px;
+          scrollbar-width:thin; scrollbar-color:rgba(99,102,241,0.3) transparent;
+        }
+        .lp-mk-scroll::-webkit-scrollbar { height:4px; }
+        .lp-mk-scroll::-webkit-scrollbar-track { background:transparent; }
+        .lp-mk-scroll::-webkit-scrollbar-thumb { background:rgba(99,102,241,0.35); border-radius:4px; }
+
         .lp-mp-card {
           position:relative; border-radius:18px; overflow:hidden;
           background:rgba(13,17,32,0.45)!important;
           backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
           border:1px solid rgba(255,255,255,0.08)!important;
           padding:0!important;
+          flex:0 0 300px; scroll-snap-align:start;
           transition:transform 320ms cubic-bezier(0.16,1,0.3,1), border-color 280ms ease, box-shadow 280ms ease;
         }
         .lp-mp-card:hover {
@@ -459,10 +472,27 @@ export default function Home() {
           position:relative; height:172px; overflow:hidden;
           border-bottom:1px solid rgba(255,255,255,0.07);
         }
+        /* bg_image_url cover layer */
+        .lp-mp-thumb-bg {
+          position:absolute; inset:0;
+          background-size:cover; background-position:center;
+          transition:transform 400ms ease;
+        }
+        .lp-mp-card:hover .lp-mp-thumb-bg { transform:scale(1.04); }
+        /* overlay gradient pour lisibilité badges + emoji */
+        .lp-mp-thumb-overlay {
+          position:absolute; inset:0;
+          background:linear-gradient(180deg, rgba(8,11,20,0.35) 0%, rgba(8,11,20,0.55) 100%);
+          z-index:1;
+        }
+        .lp-mp-thumb-emoji {
+          position:relative; z-index:2;
+          font-size:52px; filter:drop-shadow(0 6px 16px rgba(0,0,0,0.7));
+        }
         .lp-mp-thumb img { width:100%; height:100%; object-fit:cover; display:block; transition:transform 400ms ease; }
         .lp-mp-card:hover .lp-mp-thumb img { transform:scale(1.04); }
         .lp-mp-shimmer {
-          position:absolute; inset:0;
+          position:absolute; inset:0; z-index:3;
           background:linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.07) 50%, transparent 100%);
           transform:translateX(-100%); pointer-events:none;
         }
@@ -471,15 +501,24 @@ export default function Home() {
           position:absolute; top:10px;
           font-size:10px; font-weight:700;
           padding:3px 10px; border-radius:20px;
-          backdrop-filter:blur(10px); letter-spacing:0.05em; z-index:2;
+          backdrop-filter:blur(10px); letter-spacing:0.05em; z-index:4;
         }
         .lp-mp-badge-cat { left:10px; }
         .lp-mp-badge-own { right:10px; }
+        /* badge remise en bas-gauche de la thumb */
+        .lp-mp-badge-discount {
+          position:absolute; bottom:10px; left:10px; z-index:4;
+          background:rgba(245,158,11,0.92); color:#000;
+          font-size:10px; font-weight:800; padding:3px 10px; border-radius:20px;
+          letter-spacing:0.04em;
+        }
         .lp-mp-body { padding:18px 20px 20px; }
         .lp-mp-name { font-family:var(--font-display); font-size:15px; font-weight:700; color:var(--tx); margin-bottom:5px; line-height:1.3; }
         .lp-mp-tagline { font-size:12px; color:var(--tx-2); line-height:1.55; margin-bottom:16px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
         .lp-mp-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-        .lp-mp-price  { font-family:var(--font-mono); font-size:14px; font-weight:700; color:var(--gold); flex-shrink:0; }
+        .lp-mp-price-block { display:flex; flex-direction:column; gap:2px; flex-shrink:0; }
+        .lp-mp-price  { font-family:var(--font-mono); font-size:14px; font-weight:700; color:var(--gold); }
+        .lp-mp-price-original { font-family:var(--font-mono); font-size:11px; color:var(--tx-3); text-decoration:line-through; }
         .lp-mp-btn-demo {
           padding:7px 13px; border-radius:8px;
           border:1px solid rgba(99,102,241,0.4); background:rgba(99,102,241,0.1);
@@ -769,31 +808,49 @@ export default function Home() {
             <p style={{ fontSize:16, color:'var(--tx-2)' }}>Achetez-en une et on l'adapte à votre business en 48h.</p>
           </div>
 
-          <div className="mk-grid" data-stagger style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:20, marginBottom:40 }}>
+          {/* Scroll horizontal */}
+          <div className="lp-mk-scroll" style={{ marginBottom:12 }}>
             {(marketplaceApps.length > 0 ? marketplaceApps : MP_FALLBACK).map(app => {
-              const cat     = CAT_MAP[app.category] || CAT_DEFAULT
-              const views   = parseDemoViews(app.demo_views)
-              const hasDemo = views.length > 0
+              const cat      = CAT_MAP[app.category] || CAT_DEFAULT
+              const views    = parseDemoViews(app.demo_views)
+              const hasDemo  = views.length > 0
+              // Prix avec remise
+              const hasDiscount   = app.discount_pct && app.discount_pct > 0 && app.price_from
+              const discountedPrice = hasDiscount
+                ? Math.round(app.price_from * (1 - app.discount_pct / 100))
+                : null
+              // bg_image_url ou thumbnail_url ou gradient fallback
+              const hasBgImg  = !!(app.bg_image_url || app.thumbnail_url)
+              const bgUrl     = app.bg_image_url || app.thumbnail_url || null
 
               return (
-                <div key={app.id || app.name} data-animate className="card lp-mp-card card--tilt">
+                <div key={app.id || app.name} className="card lp-mp-card">
 
-                  {/* Thumbnail */}
-                  <div className="lp-mp-thumb">
-                    {app.thumbnail_url ? (
-                      <img
-                        ref={el => { if (el) el.src = app.thumbnail_url }}
-                        alt={app.name}
-                        style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}
+                  {/* ── Thumbnail ── */}
+                  <div className="lp-mp-thumb" style={{ display:'flex', alignItems:'center', justifyContent:'center' }}>
+
+                    {/* Couche fond : bg_image_url / thumbnail_url / gradient catégorie */}
+                    {hasBgImg ? (
+                      <div
+                        className="lp-mp-thumb-bg"
+                        ref={el => { if (el && bgUrl) el.style.backgroundImage = `url('${bgUrl}')` }}
                       />
                     ) : (
-                      <div style={{ width:'100%', height:'100%', background:`linear-gradient(${cat.grad})`, display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+                      <div
+                        className="lp-mp-thumb-bg"
+                        style={{ background:`linear-gradient(${cat.grad})` }}
+                      >
+                        {/* Noise grain */}
                         <div style={{ position:'absolute', inset:0, opacity:0.08, backgroundImage:`url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` }} />
-                        <span style={{ fontSize:54, filter:'drop-shadow(0 6px 16px rgba(0,0,0,0.6))', position:'relative', zIndex:1 }}>
-                          {app.icon || '📱'}
-                        </span>
                       </div>
                     )}
+
+                    {/* Overlay gradient pour lisibilité */}
+                    <div className="lp-mp-thumb-overlay" />
+
+                    {/* Emoji icône centré (toujours affiché par-dessus) */}
+                    <span className="lp-mp-thumb-emoji">{app.icon || '📱'}</span>
+
                     <div className="lp-mp-shimmer" />
 
                     {/* Badge catégorie */}
@@ -811,17 +868,34 @@ export default function Home() {
                     }}>
                       {app.owner_type === 'partner' ? '🟡 Partenaire' : '🔵 Walaup'}
                     </div>
+
+                    {/* Badge remise */}
+                    {hasDiscount && (
+                      <div className="lp-mp-badge-discount">
+                        {app.discount_label || `-${app.discount_pct}%`}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Body */}
+                  {/* ── Body ── */}
                   <div className="lp-mp-body">
                     <div className="lp-mp-name">{app.name}</div>
                     {(app.tagline || app.description) && (
                       <div className="lp-mp-tagline">{app.tagline || app.description}</div>
                     )}
                     <div className="lp-mp-footer">
-                      <div className="lp-mp-price">
-                        {app.price_from ? `Dès ${app.price_from} DT` : 'Sur demande'}
+                      {/* Prix : remise ou normal */}
+                      <div className="lp-mp-price-block">
+                        {hasDiscount ? (
+                          <>
+                            <span className="lp-mp-price-original">Dès {app.price_from} DT</span>
+                            <span className="lp-mp-price">Dès {discountedPrice} DT</span>
+                          </>
+                        ) : (
+                          <span className="lp-mp-price">
+                            {app.price_from ? `Dès ${app.price_from} DT` : 'Sur demande'}
+                          </span>
+                        )}
                       </div>
                       <div style={{ display:'flex', gap:6 }}>
                         {hasDemo && (
@@ -846,6 +920,11 @@ export default function Home() {
                 </div>
               )
             })}
+          </div>
+
+          {/* Indicateur scroll discret */}
+          <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:6, marginBottom:32 }}>
+            <div style={{ fontSize:12, color:'var(--tx-3)' }}>← Faites glisser pour voir plus →</div>
           </div>
 
           <div style={{ textAlign:'center' }}>
