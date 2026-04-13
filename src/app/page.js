@@ -849,7 +849,7 @@ export default function Home() {
                     <div className="lp-mp-thumb-overlay" />
 
                     {/* Emoji icône centré (toujours affiché par-dessus) */}
-                    <span className="lp-mp-thumb-emoji">{app.icon || '📱'}</span>
+                    
 
                     <div className="lp-mp-shimmer" />
 
