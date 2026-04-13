@@ -8,60 +8,117 @@ const GATEWAYS_DEFAULT = [
   { id: 'konnect', name: 'Konnect', emoji: '💳', desc: 'Visa/Mastercard',         enabled: true  },
   { id: 'd17',     name: 'D17',     emoji: '📲', desc: 'Mobile payment',          enabled: false },
 ]
+
 const DEFAULT_FEATURES = [
-  { id: 'f1', group: 'Base',          name: 'Caisse',             icon: '💰', price: 0,   days: 0 },
-  { id: 'f2', group: 'Base',          name: 'Gestion Stock',      icon: '📦', price: 50,  days: 2 },
-  { id: 'f3', group: 'Base',          name: 'Fiches Clients',     icon: '👥', price: 40,  days: 1 },
-  { id: 'f4', group: 'Communication', name: 'Notifications SMS',  icon: '🔔', price: 80,  days: 1 },
-  { id: 'f5', group: 'Communication', name: 'Email auto',         icon: '📧', price: 60,  days: 1 },
-  { id: 'f6', group: 'Reporting',     name: 'Rapports CA',        icon: '📊', price: 70,  days: 2 },
-  { id: 'f7', group: 'Reporting',     name: 'Export Excel',       icon: '📑', price: 40,  days: 1 },
-  { id: 'f8', group: 'Avancé',        name: 'Multi-utilisateurs', icon: '🧑', price: 100, days: 2 },
-  { id: 'f9', group: 'Avancé',        name: 'API publique',       icon: '🔌', price: 150, days: 3 },
+  { id: 'f1',  group: 'Gestion',       name: 'Tableau de bord',    icon: 'LayoutDashboard', price: 0,   days: 0 },
+  { id: 'f2',  group: 'Gestion',       name: 'Gestion du stock',   icon: 'Package',         price: 80,  days: 2 },
+  { id: 'f3',  group: 'Gestion',       name: 'Caisse & Paiement',  icon: 'CreditCard',      price: 60,  days: 2 },
+  { id: 'f4',  group: 'Gestion',       name: 'Gestion employés',   icon: 'Users',           price: 70,  days: 2 },
+  { id: 'f5',  group: 'Clients',       name: 'Suivi clients',      icon: 'UserCheck',       price: 50,  days: 1 },
+  { id: 'f6',  group: 'Clients',       name: 'Suivi des dettes',   icon: 'TrendingDown',    price: 60,  days: 2 },
+  { id: 'f7',  group: 'Clients',       name: 'Réservations',       icon: 'Calendar',        price: 80,  days: 3 },
+  { id: 'f8',  group: 'Communication', name: 'Notifications push', icon: 'Bell',            price: 40,  days: 1 },
+  { id: 'f9',  group: 'Communication', name: 'Chat interne',       icon: 'MessageSquare',   price: 80,  days: 3 },
+  { id: 'f10', group: 'Rapports',      name: 'Rapports & Stats',   icon: 'BarChart2',       price: 60,  days: 2 },
+  { id: 'f11', group: 'Rapports',      name: 'Export PDF',         icon: 'FileText',        price: 30,  days: 1 },
+  { id: 'f12', group: 'Avancé',        name: 'API & Intégrations', icon: 'Link2',           price: 120, days: 4 },
 ]
+
+// ─── DEFAULT_TARIFS : inclut maintenant les features/excluded de chaque pack ─
 const DEFAULT_TARIFS = {
-  essentiel:  { annual: 300, renewal: 280 },
-  pro:        { annual: 600, renewal: 550, monthly: 40, monetization_extra: 20 },
-  partenaire: { one_time: 1500, monthly_support: 80 },
+  essentiel: {
+    annual: 300, renewal: 280, monthly: 20,
+    features: [
+      'App sur mesure de base',
+      'Fonctionnalités choisies',
+      'Support email',
+      'Mises à jour incluses',
+    ],
+    excluded: [
+      'Dashboard avancé',
+      'Multi-utilisateurs',
+      'Monétisation marketplace',
+    ],
+  },
+  pro: {
+    annual: 600, renewal: 550, monthly: 40, monetization_extra: 20,
+    features: [
+      'App complète sur mesure',
+      'Toutes les fonctionnalités',
+      'Multi-utilisateurs',
+      'Dashboard analytique',
+      'Support prioritaire',
+      'Mises à jour illimitées',
+      'Option monétisation',
+    ],
+    excluded: [],
+  },
+  partenaire: {
+    one_time: 1500, monthly_support: 80, monthly: 80,
+    features: [
+      'App complète + propriété 100%',
+      'Publication marketplace Walaup',
+      'Revenus passifs (60–70%)',
+      'Accompagnement business',
+      'Support dédié',
+      'Achat unique — accès à vie',
+    ],
+    excluded: [],
+  },
   commission_walaup: 40,
 }
+
 const DEFAULT_GENERAL = {
   agence: 'Walaup', email: 'contact@walaup.tn', phone: '+216 XX XXX XXX',
   delivery_label: '48h', welcome_text: 'Bienvenue sur votre espace Walaup !'
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const arrToText = (arr) => (Array.isArray(arr) ? arr : []).join('\n')
+const textToArr = (text) => (text || '').split('\n').map(s => s.trim()).filter(Boolean)
+
 function SaveBtn({ onClick, saved, loading }) {
-  const sBtn = {
-    display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 9,
-    background: saved ? 'linear-gradient(135deg,#10B981,#059669)' : 'linear-gradient(135deg,#6366F1,#8B5CF6)',
-    border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-    marginTop: 14, transition: 'transform 150ms', opacity: loading ? 0.7 : 1,
-  }
   return (
-    <button style={sBtn} onClick={onClick} disabled={loading}>
-      {saved ? <><CheckCircle2 size={13} /> Enregistré</> : <><Save size={13} /> Enregistrer</>}
+    <button
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '7px 16px', borderRadius: 9, marginTop: 14,
+        background: saved
+          ? 'linear-gradient(135deg,#10B981,#059669)'
+          : 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+        border: 'none', color: '#fff', fontSize: 12, fontWeight: 700,
+        cursor: 'pointer', transition: 'transform 150ms',
+        opacity: loading ? 0.7 : 1,
+      }}
+      onClick={onClick}
+      disabled={loading}
+    >
+      {saved
+        ? <><CheckCircle2 size={13} /> Enregistré</>
+        : <><Save size={13} /> Enregistrer</>}
     </button>
   )
 }
 
 export default function TabConfig() {
-  const [tarifs, setTarifs]     = useState(DEFAULT_TARIFS)
+  const [tarifs,   setTarifs]   = useState(DEFAULT_TARIFS)
   const [features, setFeatures] = useState(DEFAULT_FEATURES)
   const [gateways, setGateways] = useState(GATEWAYS_DEFAULT)
-  const [general, setGeneral]   = useState(DEFAULT_GENERAL)
+  const [general,  setGeneral]  = useState(DEFAULT_GENERAL)
   const [showKeys, setShowKeys] = useState({})
-  const [saved, setSaved]       = useState({})
-  const [saving, setSaving]     = useState({})
+  const [saved,    setSaved]    = useState({})
+  const [saving,   setSaving]   = useState({})
 
   useEffect(() => {
     supabase.from('config').select('key, value').then(({ data }) => {
       if (!data) return
       const cfg = {}
       data.forEach(row => { cfg[row.key] = row.value })
-      if (cfg.tarifs)   setTarifs(cfg.tarifs)
-      if (cfg.features) setFeatures(cfg.features)
-      if (cfg.gateways) setGateways(cfg.gateways)
-      if (cfg.general)  setGeneral(cfg.general)
+      if (cfg.tarifs)              setTarifs(t => ({ ...DEFAULT_TARIFS, ...cfg.tarifs, essentiel: { ...DEFAULT_TARIFS.essentiel, ...cfg.tarifs.essentiel }, pro: { ...DEFAULT_TARIFS.pro, ...cfg.tarifs.pro }, partenaire: { ...DEFAULT_TARIFS.partenaire, ...cfg.tarifs.partenaire } }))
+      // ✅ Clé correcte : estimateur_features (alignée avec estimateur/page.js)
+      if (cfg.estimateur_features) setFeatures(cfg.estimateur_features)
+      if (cfg.gateways)            setGateways(cfg.gateways)
+      if (cfg.general)             setGeneral(cfg.general)
     })
   }, [])
 
@@ -72,25 +129,27 @@ export default function TabConfig() {
     setSaved(p => ({ ...p, [key]: true }))
     setTimeout(() => setSaved(p => ({ ...p, [key]: false })), 2500)
   }
+
   const setT = (pack, field) => (e) => {
     const v = parseFloat(e.target.value) || 0
     setTarifs(p => ({ ...p, [pack]: { ...p[pack], [field]: v } }))
   }
-  const toggleGw     = (id) => setGateways(prev => prev.map(g => g.id === id ? { ...g, enabled: !g.enabled } : g))
-  const addFeature   = () => setFeatures(prev => [...prev, { id: Date.now().toString(), group: 'Base', name: 'Nouvelle feature', icon: '⭐', price: 0, days: 1 }])
+  const setTArr = (pack, field) => (e) => {
+    setTarifs(p => ({ ...p, [pack]: { ...p[pack], [field]: textToArr(e.target.value) } }))
+  }
+
+  const toggleGw      = (id) => setGateways(prev => prev.map(g => g.id === id ? { ...g, enabled: !g.enabled } : g))
+  const addFeature    = () => setFeatures(prev => [...prev, { id: Date.now().toString(), group: 'Base', name: 'Nouvelle feature', icon: 'Package', price: 0, days: 1 }])
   const removeFeature = (id) => setFeatures(prev => prev.filter(f => f.id !== id))
 
-  const commissionPartner = 100 - tarifs.commission_walaup
+  const commissionPartner = 100 - (tarifs.commission_walaup || 40)
   const examplePrice  = 299
   const partnerGets   = Math.round(examplePrice * commissionPartner / 100)
   const walaupGets    = examplePrice - partnerGets
 
-  // ─ Static style constants ─
-  const s2col        = { marginBottom: 14 }
-  const sReadOnly    = { color: 'var(--tx-3)' }
-  const sPreview     = { marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', fontSize: 12, color: 'var(--tx-2)' }
-  const sWebhook     = { fontSize: 10, color: 'var(--tx-3)', marginTop: 4 }
-  const sGenField    = { marginTop: 14 }
+  const sPreview = { marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', fontSize: 12, color: 'var(--tx-2)' }
+  const sWebhook = { fontSize: 10, color: 'var(--tx-3)', marginTop: 4 }
+  const sFullCol = { gridColumn: '1 / -1' }
 
   const CSS = `
     .adm-cfg { padding:24px; overflow-y:auto; height:100%; }
@@ -106,7 +165,10 @@ export default function TabConfig() {
     .adm-cfg-inp { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:9px; padding:8px 11px; color:var(--tx); font-size:13px; outline:none; font-family:'JetBrains Mono',monospace; width:100%; box-sizing:border-box; }
     .adm-cfg-inp:focus { border-color:rgba(99,102,241,0.4); }
     .adm-cfg-inp-text { font-family:'Inter',sans-serif; }
+    .adm-cfg-inp-textarea { resize:vertical; min-height:80px; font-size:12px; line-height:1.6; }
     .adm-cfg-unit { font-size:11px; color:var(--tx-3); margin-top:2px; }
+    .adm-cfg-hint { font-size:10px; color:var(--tx-3); margin-top:3px; font-style:italic; }
+    .adm-pack-divider { margin:16px 0 10px; padding-bottom:8px; border-bottom:1px dashed rgba(255,255,255,0.06); font-size:11px; font-weight:700; color:var(--tx-3); letter-spacing:.05em; text-transform:uppercase; }
     .adm-feat-head { display:grid; grid-template-columns:36px 1fr 1fr 80px 70px 32px; gap:8px; padding:0 0 8px; border-bottom:1px solid rgba(255,255,255,0.06); }
     .adm-feat-col-label { font-size:9px; font-weight:700; color:var(--tx-3); letter-spacing:.07em; text-transform:uppercase; }
     .adm-feat-row { display:grid; grid-template-columns:36px 1fr 1fr 80px 70px 32px; gap:8px; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04); }
@@ -135,42 +197,113 @@ export default function TabConfig() {
       <div className="adm-cfg">
         <div className="adm-cfg-title">Configuration</div>
 
+        {/* ── TARIFS PACKS ── */}
         <div className="adm-cfg-section">
-          <div className="adm-cfg-sec-title">Tarifs packs</div>
-          <div className="adm-cfg-2col" style={s2col}>
+          <div className="adm-cfg-sec-title">Tarifs & contenu des packs</div>
+          <p style={{ fontSize:11, color:'var(--tx-3)', marginBottom:16, marginTop:-8 }}>
+            Ces valeurs sont synchronisées en temps réel sur la landing page et l'estimateur.
+          </p>
+
+          {/* ─ ESSENTIEL ─ */}
+          <div className="adm-pack-divider">Pack Essentiel</div>
+          <div className="adm-cfg-2col" style={{ marginBottom:12 }}>
             <div className="adm-cfg-field">
-              <label className="adm-cfg-label">Essentiel — Achat annuel</label>
+              <label className="adm-cfg-label">Achat annuel (DT)</label>
               <input className="adm-cfg-inp" type="number" value={tarifs.essentiel?.annual || ''} onChange={setT('essentiel','annual')} />
-              <span className="adm-cfg-unit">DT / an</span>
             </div>
             <div className="adm-cfg-field">
-              <label className="adm-cfg-label">Essentiel — Renouvellement</label>
+              <label className="adm-cfg-label">Renouvellement annuel (DT)</label>
               <input className="adm-cfg-inp" type="number" value={tarifs.essentiel?.renewal || ''} onChange={setT('essentiel','renewal')} />
-              <span className="adm-cfg-unit">DT / an</span>
             </div>
             <div className="adm-cfg-field">
-              <label className="adm-cfg-label">Pro — Achat annuel</label>
+              <label className="adm-cfg-label">Abonnement mensuel (DT/mois)</label>
+              <input className="adm-cfg-inp" type="number" value={tarifs.essentiel?.monthly || ''} onChange={setT('essentiel','monthly')} />
+            </div>
+          </div>
+          <div className="adm-cfg-2col">
+            <div className="adm-cfg-field">
+              <label className="adm-cfg-label">Fonctionnalités incluses</label>
+              <textarea
+                className="adm-cfg-inp adm-cfg-inp-text adm-cfg-inp-textarea"
+                value={arrToText(tarifs.essentiel?.features)}
+                onChange={setTArr('essentiel','features')}
+                rows={4}
+              />
+              <span className="adm-cfg-hint">Une fonctionnalité par ligne</span>
+            </div>
+            <div className="adm-cfg-field">
+              <label className="adm-cfg-label">Non inclus (barrés)</label>
+              <textarea
+                className="adm-cfg-inp adm-cfg-inp-text adm-cfg-inp-textarea"
+                value={arrToText(tarifs.essentiel?.excluded)}
+                onChange={setTArr('essentiel','excluded')}
+                rows={4}
+              />
+              <span className="adm-cfg-hint">Une par ligne — affichés barrés</span>
+            </div>
+          </div>
+
+          {/* ─ PRO ─ */}
+          <div className="adm-pack-divider">Pack Pro</div>
+          <div className="adm-cfg-2col" style={{ marginBottom:12 }}>
+            <div className="adm-cfg-field">
+              <label className="adm-cfg-label">Achat annuel (DT)</label>
               <input className="adm-cfg-inp" type="number" value={tarifs.pro?.annual || ''} onChange={setT('pro','annual')} />
             </div>
             <div className="adm-cfg-field">
-              <label className="adm-cfg-label">Pro — Mensuel</label>
+              <label className="adm-cfg-label">Renouvellement annuel (DT)</label>
+              <input className="adm-cfg-inp" type="number" value={tarifs.pro?.renewal || ''} onChange={setT('pro','renewal')} />
+            </div>
+            <div className="adm-cfg-field">
+              <label className="adm-cfg-label">Abonnement mensuel (DT/mois)</label>
               <input className="adm-cfg-inp" type="number" value={tarifs.pro?.monthly || ''} onChange={setT('pro','monthly')} />
-              <span className="adm-cfg-unit">DT / mois</span>
             </div>
             <div className="adm-cfg-field">
-              <label className="adm-cfg-label">Partenaire — Achat unique</label>
-              <input className="adm-cfg-inp" type="number" value={tarifs.partenaire?.one_time || ''} onChange={setT('partenaire','one_time')} />
-              <span className="adm-cfg-unit">DT — one-time</span>
-            </div>
-            <div className="adm-cfg-field">
-              <label className="adm-cfg-label">Partenaire — Support mensuel</label>
-              <input className="adm-cfg-inp" type="number" value={tarifs.partenaire?.monthly_support || ''} onChange={setT('partenaire','monthly_support')} />
-              <span className="adm-cfg-unit">DT / mois</span>
+              <label className="adm-cfg-label">Supplément monétisation (DT/mois)</label>
+              <input className="adm-cfg-inp" type="number" value={tarifs.pro?.monetization_extra || ''} onChange={setT('pro','monetization_extra')} />
             </div>
           </div>
+          <div className="adm-cfg-2col">
+            <div className="adm-cfg-field">
+              <label className="adm-cfg-label">Fonctionnalités incluses</label>
+              <textarea className="adm-cfg-inp adm-cfg-inp-text adm-cfg-inp-textarea" value={arrToText(tarifs.pro?.features)} onChange={setTArr('pro','features')} rows={5} />
+              <span className="adm-cfg-hint">Une fonctionnalité par ligne</span>
+            </div>
+            <div className="adm-cfg-field">
+              <label className="adm-cfg-label">Non inclus (barrés)</label>
+              <textarea className="adm-cfg-inp adm-cfg-inp-text adm-cfg-inp-textarea" value={arrToText(tarifs.pro?.excluded)} onChange={setTArr('pro','excluded')} rows={5} />
+            </div>
+          </div>
+
+          {/* ─ PARTENAIRE ─ */}
+          <div className="adm-pack-divider">Pack Partenaire</div>
+          <div className="adm-cfg-2col" style={{ marginBottom:12 }}>
+            <div className="adm-cfg-field">
+              <label className="adm-cfg-label">Achat unique (DT — à vie)</label>
+              <input className="adm-cfg-inp" type="number" value={tarifs.partenaire?.one_time || ''} onChange={setT('partenaire','one_time')} />
+            </div>
+            <div className="adm-cfg-field">
+              <label className="adm-cfg-label">Support mensuel (DT/mois)</label>
+              <input className="adm-cfg-inp" type="number" value={tarifs.partenaire?.monthly_support || ''} onChange={setT('partenaire','monthly_support')} />
+              <span className="adm-cfg-unit">= monthly affiché sur les packs</span>
+            </div>
+          </div>
+          <div className="adm-cfg-2col">
+            <div className="adm-cfg-field">
+              <label className="adm-cfg-label">Fonctionnalités incluses</label>
+              <textarea className="adm-cfg-inp adm-cfg-inp-text adm-cfg-inp-textarea" value={arrToText(tarifs.partenaire?.features)} onChange={setTArr('partenaire','features')} rows={5} />
+              <span className="adm-cfg-hint">Une fonctionnalité par ligne</span>
+            </div>
+            <div className="adm-cfg-field">
+              <label className="adm-cfg-label">Non inclus (barrés)</label>
+              <textarea className="adm-cfg-inp adm-cfg-inp-text adm-cfg-inp-textarea" value={arrToText(tarifs.partenaire?.excluded)} onChange={setTArr('partenaire','excluded')} rows={5} />
+            </div>
+          </div>
+
           <SaveBtn onClick={() => doSave('tarifs', tarifs)} saved={saved.tarifs} loading={saving.tarifs} />
         </div>
 
+        {/* ── COMMISSION MARKETPLACE ── */}
         <div className="adm-cfg-section">
           <div className="adm-cfg-sec-title">Commission Marketplace</div>
           <div className="adm-cfg-2col">
@@ -181,7 +314,7 @@ export default function TabConfig() {
             </div>
             <div className="adm-cfg-field">
               <label className="adm-cfg-label">Part Partenaire (%)</label>
-              <input className="adm-cfg-inp" value={commissionPartner} readOnly style={sReadOnly} />
+              <input className="adm-cfg-inp" value={commissionPartner} readOnly style={{ color:'var(--tx-3)' }} />
               <span className="adm-cfg-unit">Calculé automatiquement</span>
             </div>
           </div>
@@ -193,8 +326,13 @@ export default function TabConfig() {
           <SaveBtn onClick={() => doSave('tarifs', tarifs)} saved={saved.tarifs} loading={saving.tarifs} />
         </div>
 
+        {/* ── FONCTIONNALITÉS ESTIMATEUR ── */}
+        {/* ✅ Clé : estimateur_features (alignée avec estimateur/page.js) */}
         <div className="adm-cfg-section">
           <div className="adm-cfg-sec-title">Fonctionnalités estimateur</div>
+          <p style={{ fontSize:11, color:'var(--tx-3)', marginBottom:14, marginTop:-8 }}>
+            Ces fonctionnalités apparaissent dans l'estimateur. Les prix s'y calculent en temps réel.
+          </p>
           <div className="adm-feat-head">
             <span className="adm-feat-col-label">Ico</span>
             <span className="adm-feat-col-label">Nom</span>
@@ -214,9 +352,11 @@ export default function TabConfig() {
             </div>
           ))}
           <button className="adm-feat-add" onClick={addFeature}><Plus size={12} /> Ajouter une fonctionnalité</button>
-          <SaveBtn onClick={() => doSave('features', features)} saved={saved.features} loading={saving.features} />
+          {/* ✅ Sauvegarde sous clé 'estimateur_features' */}
+          <SaveBtn onClick={() => doSave('estimateur_features', features)} saved={saved.estimateur_features} loading={saving.estimateur_features} />
         </div>
 
+        {/* ── PASSERELLES ── */}
         <div className="adm-cfg-section">
           <div className="adm-cfg-sec-title">Passerelles de paiement</div>
           {gateways.map(gw => {
@@ -245,17 +385,23 @@ export default function TabConfig() {
           <SaveBtn onClick={() => doSave('gateways', gateways)} saved={saved.gateways} loading={saving.gateways} />
         </div>
 
+        {/* ── GÉNÉRAL ── */}
         <div className="adm-cfg-section">
           <div className="adm-cfg-sec-title">Informations générales</div>
           <div className="adm-cfg-2col">
-            {[{ key: 'agence', label: 'Nom agence' }, { key: 'email', label: 'Email contact' }, { key: 'phone', label: 'Téléphone' }, { key: 'delivery_label', label: 'Délai livraison démo' }].map(({ key, label }) => (
+            {[
+              { key: 'agence',         label: 'Nom agence' },
+              { key: 'email',          label: 'Email contact' },
+              { key: 'phone',          label: 'Téléphone' },
+              { key: 'delivery_label', label: 'Délai livraison démo' },
+            ].map(({ key, label }) => (
               <div key={key} className="adm-cfg-field">
                 <label className="adm-cfg-label">{label}</label>
                 <input className="adm-cfg-inp adm-cfg-inp-text" value={general[key] || ''} onChange={e => setGeneral(p => ({ ...p, [key]: e.target.value }))} />
               </div>
             ))}
           </div>
-          <div className="adm-cfg-field" style={sGenField}>
+          <div className="adm-cfg-field" style={{ marginTop:14 }}>
             <label className="adm-cfg-label">Texte d'accueil espace client</label>
             <textarea className="adm-cfg-inp adm-cfg-inp-text" rows={2} value={general.welcome_text || ''} onChange={e => setGeneral(p => ({ ...p, welcome_text: e.target.value }))} />
           </div>
