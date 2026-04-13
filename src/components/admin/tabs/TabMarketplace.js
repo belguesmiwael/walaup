@@ -2,10 +2,15 @@
 import { useState, useEffect } from 'react'
 import {
   Plus, Edit2, Eye, EyeOff, Trash2, ExternalLink,
-  RefreshCw, X, Percent, Monitor, Layers
+  RefreshCw, X, Percent, Monitor, Layers, Upload, Image
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { WalaupSound } from '@/lib/sound'
+
+/* ── Upload helper — Supabase Storage ── */
+const BUCKET = 'marketplace-assets'
+const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'webp', 'svg', 'gif']
+const MAX_SIZE_MB = 5
 
 /* ─────────────────────────────────────────────────────────────────
    Constants
@@ -130,8 +135,16 @@ const CSS = `
   .adm-dv-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .adm-dv-full { grid-column:1/-1; }
 
-  /* ── Image preview ── */
-  .adm-img-prev { width:100%; height:88px; border-radius:9px; object-fit:cover; margin-top:6px; border:1px solid rgba(255,255,255,0.08); display:block; }
+  /* ── Image upload zone ── */
+  .adm-upload-zone { border:2px dashed rgba(99,102,241,0.3); border-radius:12px; padding:18px; text-align:center; cursor:pointer; transition:all 150ms; background:rgba(99,102,241,0.04); position:relative; }
+  .adm-upload-zone:hover { border-color:rgba(99,102,241,0.55); background:rgba(99,102,241,0.08); }
+  .adm-upload-zone.uploading { opacity:0.6; cursor:wait; pointer-events:none; }
+  .adm-upload-inp { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+  .adm-upload-label { font-size:12px; color:var(--tx-3); display:flex; flex-direction:column; align-items:center; gap:6px; pointer-events:none; }
+  .adm-upload-preview { width:100%; height:110px; border-radius:10px; object-fit:cover; display:block; margin-top:8px; border:1px solid rgba(255,255,255,0.08); }
+  .adm-upload-preview--sm { width:64px; height:64px; border-radius:12px; object-fit:cover; display:block; margin-top:8px; border:1px solid rgba(255,255,255,0.08); }
+  .adm-upload-clear { margin-top:7px; padding:4px 10px; border-radius:7px; border:1px solid rgba(248,113,113,0.3); background:rgba(248,113,113,0.07); color:#F87171; font-size:11px; cursor:pointer; font-family:'Inter',sans-serif; transition:all 120ms; }
+  .adm-upload-clear:hover { background:rgba(248,113,113,0.16); }
 
   @media(max-width:520px) {
     .adm-f3col { grid-template-columns:1fr 1fr; }
@@ -151,6 +164,29 @@ export default function TabMarketplace() {
   const [form,      setForm]      = useState(EMPTY_FORM)
   const [saving,    setSaving]    = useState(false)
   const [msg,       setMsg]       = useState(null) // { type: 'success'|'error', text }
+  const [uploading, setUploading] = useState({}) // { bg_image_url: bool, thumbnail_url: bool }
+
+  /* ── Upload image to Supabase Storage ── */
+  const uploadImage = async (file, field) => {
+    const ext = file.name.split('.').pop().toLowerCase()
+    if (!ALLOWED_EXT.includes(ext))
+      return setMsg({ type: 'error', text: `Format non supporté. Utilisez : ${ALLOWED_EXT.join(', ')}` })
+    if (file.size > MAX_SIZE_MB * 1024 * 1024)
+      return setMsg({ type: 'error', text: `Image trop lourde. Maximum ${MAX_SIZE_MB}MB.` })
+
+    setUploading(p => ({ ...p, [field]: true }))
+    setMsg(null)
+
+    const path = `apps/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`
+    const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false })
+    if (error) {
+      setUploading(p => ({ ...p, [field]: false }))
+      return setMsg({ type: 'error', text: `Upload échoué : ${error.message}` })
+    }
+    const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path)
+    setForm(p => ({ ...p, [field]: urlData.publicUrl }))
+    setUploading(p => ({ ...p, [field]: false }))
+  }
 
   /* ── Fetch — client-side sort, no orderBy composite ── */
   const fetchApps = async () => {
@@ -524,32 +560,60 @@ export default function TabMarketplace() {
                   <div className="adm-sec-line" /><span className="adm-sec-lbl">Visuels</span><div className="adm-sec-line" />
                 </div>
 
+                {/* bg_image_url upload */}
                 <div className="adm-frow">
-                  <label className="adm-flabel">Image de fond — card marketplace</label>
-                  <input className="adm-finp" value={form.bg_image_url} onChange={f('bg_image_url')} placeholder="https://… ou /images/…" maxLength={500} />
-                  <div className="adm-fhint">Utilisée comme background visuel de la card</div>
-                  {form.bg_image_url && (
-                    <img
-                      alt="Aperçu fond"
-                      className="adm-img-prev"
-                      onError={e => { e.target.style.display = 'none' }}
-                      /* src assigné via JS ref pattern — pas dans HTML string */
-                      ref={el => { if (el) el.src = form.bg_image_url }}
+                  <label className="adm-flabel" style={{ display:'flex', alignItems:'center', gap:4 }}>
+                    <Image size={10} /> Image de fond — card marketplace
+                  </label>
+                  <div className={`adm-upload-zone${uploading.bg_image_url ? ' uploading' : ''}`}>
+                    <input
+                      type="file" accept="image/*" className="adm-upload-inp"
+                      onChange={e => e.target.files[0] && uploadImage(e.target.files[0], 'bg_image_url')}
                     />
+                    {form.bg_image_url ? (
+                      <div className="adm-upload-label">
+                        <img alt="Fond" className="adm-upload-preview" ref={el => { if (el) el.src = form.bg_image_url }} />
+                        <span style={{ fontSize:10, opacity:.6 }}>Cliquer pour remplacer</span>
+                      </div>
+                    ) : (
+                      <div className="adm-upload-label">
+                        <Upload size={20} style={{ color:'var(--ac)', opacity:.7 }} />
+                        <span>{uploading.bg_image_url ? 'Upload en cours…' : 'Cliquer pour choisir une image'}</span>
+                        <span style={{ fontSize:10, opacity:.6 }}>JPG, PNG, WebP, SVG — max 5MB</span>
+                      </div>
+                    )}
+                  </div>
+                  {form.bg_image_url && (
+                    <button className="adm-upload-clear" onClick={() => setForm(p => ({ ...p, bg_image_url: '' }))}>× Supprimer</button>
                   )}
+                  <div className="adm-fhint">Background visuel affiché sur la card marketplace</div>
                 </div>
 
+                {/* thumbnail_url upload */}
                 <div className="adm-frow">
-                  <label className="adm-flabel">Thumbnail / Icône image</label>
-                  <input className="adm-finp" value={form.thumbnail_url} onChange={f('thumbnail_url')} placeholder="https://… ou /images/…" maxLength={500} />
-                  {form.thumbnail_url && (
-                    <img
-                      alt="Aperçu thumbnail"
-                      className="adm-img-prev"
-                      style={{ height: 60, width: 60, borderRadius: 12, objectFit:'cover' }}
-                      onError={e => { e.target.style.display = 'none' }}
-                      ref={el => { if (el) el.src = form.thumbnail_url }}
+                  <label className="adm-flabel" style={{ display:'flex', alignItems:'center', gap:4 }}>
+                    <Image size={10} /> Icône / Thumbnail de l'app
+                  </label>
+                  <div className={`adm-upload-zone${uploading.thumbnail_url ? ' uploading' : ''}`} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 16px', textAlign:'left', justifyContent:'flex-start' }}>
+                    <input
+                      type="file" accept="image/*" className="adm-upload-inp"
+                      onChange={e => e.target.files[0] && uploadImage(e.target.files[0], 'thumbnail_url')}
                     />
+                    {form.thumbnail_url
+                      ? <img alt="Icône" className="adm-upload-preview--sm" ref={el => { if (el) el.src = form.thumbnail_url }} />
+                      : <div style={{ width:56, height:56, borderRadius:12, background:'rgba(99,102,241,0.12)', border:'1px solid rgba(99,102,241,0.2)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                          <Upload size={16} style={{ color:'var(--ac)', opacity:.6 }} />
+                        </div>
+                    }
+                    <div className="adm-upload-label" style={{ alignItems:'flex-start' }}>
+                      <span style={{ fontWeight:600, color:'var(--tx-2)' }}>
+                        {uploading.thumbnail_url ? 'Upload en cours…' : form.thumbnail_url ? 'Cliquer pour remplacer' : 'Choisir une icône'}
+                      </span>
+                      <span style={{ fontSize:10 }}>PNG, SVG, WebP — format carré recommandé</span>
+                    </div>
+                  </div>
+                  {form.thumbnail_url && (
+                    <button className="adm-upload-clear" onClick={() => setForm(p => ({ ...p, thumbnail_url: '' }))}>× Supprimer</button>
                   )}
                 </div>
               </div>
