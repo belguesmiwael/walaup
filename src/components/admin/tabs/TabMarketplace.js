@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import {
   Plus, Edit2, Eye, EyeOff, Trash2, ExternalLink,
-  RefreshCw, X, Percent, Monitor, Layers, Upload, Image
+  RefreshCw, X, Percent, Monitor, Layers, Upload, Image as ImageIcon
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { WalaupSound } from '@/lib/sound'
@@ -379,8 +379,11 @@ export default function TabMarketplace() {
               {/* Icon / thumbnail */}
               <div className="adm-app-icon">
                 {app.thumbnail_url
-                  ? (() => { const img = new Image(); return null })() || // createElement pattern
-                    <span style={{ fontSize: 20 }}>{app.icon || '📱'}</span>
+                  ? <img
+                      alt={app.name}
+                      style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:12 }}
+                      ref={el => { if (el) el.src = app.thumbnail_url }}
+                    />
                   : <span style={{ fontSize: 20 }}>{app.icon || '📱'}</span>
                 }
               </div>
@@ -563,7 +566,7 @@ export default function TabMarketplace() {
                 {/* bg_image_url upload */}
                 <div className="adm-frow">
                   <label className="adm-flabel" style={{ display:'flex', alignItems:'center', gap:4 }}>
-                    <Image size={10} /> Image de fond — card marketplace
+                    <ImageIcon size={10} /> Image de fond — card marketplace
                   </label>
                   <div className={`adm-upload-zone${uploading.bg_image_url ? ' uploading' : ''}`}>
                     <input
@@ -592,7 +595,7 @@ export default function TabMarketplace() {
                 {/* thumbnail_url upload */}
                 <div className="adm-frow">
                   <label className="adm-flabel" style={{ display:'flex', alignItems:'center', gap:4 }}>
-                    <Image size={10} /> Icône / Thumbnail de l'app
+                    <ImageIcon size={10} /> Icône / Thumbnail de l'app
                   </label>
                   <div className={`adm-upload-zone${uploading.thumbnail_url ? ' uploading' : ''}`} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 16px', textAlign:'left', justifyContent:'flex-start' }}>
                     <input
