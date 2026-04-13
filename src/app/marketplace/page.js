@@ -415,13 +415,13 @@ const CSS = `
   .mp-phone-screen { width:260px; height:522px; border-radius:30px; overflow:hidden; background:#000; position:relative; }
 
   /* Browser frame */
-  .mp-browser-area { flex:1; display:flex; align-items:center; justify-content:center; padding:2rem; overflow:hidden; }
-  .mp-browser-shell { width:min(920px,100%); background:rgba(13,17,32,.92); border:1px solid rgba(255,255,255,.1); border-radius:16px; overflow:hidden; box-shadow:0 48px 120px rgba(0,0,0,.85); animation:mp-scalein .3s cubic-bezier(.16,1,.3,1); }
+  .mp-browser-area { flex:1; display:flex; align-items:stretch; justify-content:center; padding:1rem 1.5rem; overflow:hidden; }
+  .mp-browser-shell { width:100%; max-width:1100px; background:rgba(13,17,32,.92); border:1px solid rgba(255,255,255,.1); border-radius:16px; overflow:hidden; box-shadow:0 48px 120px rgba(0,0,0,.85); animation:mp-scalein .3s cubic-bezier(.16,1,.3,1); display:flex; flex-direction:column; }
   .mp-browser-bar { background:rgba(17,24,39,.9); border-bottom:1px solid rgba(255,255,255,.06); padding:10px 16px; display:flex; align-items:center; gap:12px; }
   .mp-browser-dots { display:flex; gap:6px; }
   .mp-browser-dot  { width:10px; height:10px; border-radius:50%; }
-  .mp-browser-url  { flex:1; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); border-radius:6px; padding:4px 12px; font-size:.74rem; color:#8b90b8; font-family:'JetBrains Mono',monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .mp-browser-content { height:500px; overflow:hidden; }
+  .mp-browser-url  { flex:1; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); border-radius:6px; padding:4px 12px; font-size:.74rem; color:#8b90b8; font-family:'Inter',sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:6px; }
+  .mp-browser-content { height:calc(100vh - 220px); min-height:460px; overflow:hidden; }
   .mp-browser-content iframe { width:100%; height:100%; border:none; display:block; }
 
   /* Demo no-views placeholder */
@@ -755,14 +755,11 @@ export default function MarketplacePage() {
                   {/* Thumb */}
                   <div className="mp-thumb">
                     {app.bg_image_url
-                      ? (() => {
-                          const img = document.createElement('img')
-                          return <img
-                            alt={app.name}
-                            style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}
-                            ref={el => { if (el) el.src = app.bg_image_url }}
-                          />
-                        })()
+                      ? <img
+                          alt={app.name}
+                          style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}
+                          ref={el => { if (el) el.src = app.bg_image_url }}
+                        />
                       : <div className="mp-thumb-emoji">{app.icon || '📱'}</div>
                     }
                     <div className="mp-thumb-veil" />
@@ -1074,7 +1071,6 @@ export default function MarketplacePage() {
                 <div className="mp-phone-notch" />
                 <div className="mp-phone-screen" ref={screenRef}>
                   <iframe
-                    ref={iframeRef}
                     sandbox="allow-scripts allow-forms allow-popups"
                     onLoad={scaleMobileIframe}
                     title={`Démo ${demoApp.name} — ${activeView?.label || ''}`}
@@ -1097,7 +1093,8 @@ export default function MarketplacePage() {
                     <div className="mp-browser-dot" style={{ background: '#34d399' }} />
                   </div>
                   <div className="mp-browser-url">
-                    {currentIframeUrl.startsWith('/') ? `walaup.vercel.app${currentIframeUrl}` : currentIframeUrl}
+                    <span style={{ color:'#10b981', fontSize:'.65rem' }}>●</span>
+                    <span>Démo interactive — {demoApp.name}{activeView?.label ? ` · ${activeView.label}` : ''}</span>
                   </div>
                 </div>
                 <div className="mp-browser-content">
