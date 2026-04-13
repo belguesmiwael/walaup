@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import {
   FileText, Package, TrendingDown, Users, BarChart2,
@@ -8,8 +8,10 @@ import {
   Smartphone, Target, Globe, Hand,
   CheckCircle2, ArrowRight, Sparkles, Zap, Shield,
   ChevronRight, Star, Calculator, LogIn,
+  X, Monitor,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { WalaupSound } from '@/lib/sound'
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
 
@@ -74,6 +76,23 @@ const PACKS = [
 ]
 
 const CHIPS = ['App Café', 'App Stock', 'App Livraison', 'App Dettes', 'App Crèche', 'App Médecin']
+
+// ─── Marketplace constants ─────────────────────────────────────────────────────
+
+const CAT_MAP = {
+  Restaurant: { grad: '135deg, #c2410c 0%, #f59e0b 100%', tx: '#fb923c' },
+  Retail:     { grad: '135deg, #4338ca 0%, #7c3aed 100%', tx: '#818cf8' },
+  Services:   { grad: '135deg, #0e7490 0%, #0891b2 100%', tx: '#22d3ee' },
+  Médical:    { grad: '135deg, #065f46 0%, #10b981 100%', tx: '#34d399' },
+  Education:  { grad: '135deg, #92400e 0%, #d97706 100%', tx: '#fbbf24' },
+}
+const CAT_DEFAULT = { grad: '135deg, #3730a3 0%, #6d28d9 100%', tx: 'var(--ac)' }
+
+const MP_FALLBACK = [
+  { id: 'f1', name: 'App Café & Restaurant', tagline: 'Caisse anti-vol, commandes par table, gestion employés', category: 'Restaurant', owner_type: 'walaup', price_from: 299, icon: '☕', demo_views: [] },
+  { id: 'f2', name: 'App Grossiste & Stock',  tagline: 'Entrées/sorties temps réel, alertes rupture, clients',   category: 'Retail',     owner_type: 'walaup', price_from: 349, icon: '📦', demo_views: [] },
+  { id: 'f3', name: 'App Suivi Dettes',       tagline: 'Clients débiteurs, relances automatiques, trésorerie',   category: 'Services',   owner_type: 'walaup', price_from: 249, icon: '💳', demo_views: [] },
+]
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -301,6 +320,9 @@ export default function Home() {
   const [testimonials, setTestimonials]       = useState(TESTIMONIALS_FALLBACK)
   const [testimonialIdx, setTestimonialIdx]   = useState(0)
   const [marketplaceApps, setMarketplaceApps] = useState([])
+  const [demoState, setDemoState]             = useState(null) // { app, views, activeIdx, device }
+  const [authChecking, setAuthChecking]       = useState(false)
+  const iframeRef = useRef(null)
 
   useEffect(() => {
     supabase.from('testimonials').select('*').eq('active', true).limit(6)
@@ -319,11 +341,62 @@ export default function Home() {
     window.dispatchEvent(new CustomEvent('walaup:route-change'))
   }, [])
 
+  // Fermer overlay avec Escape
+  useEffect(() => {
+    if (!demoState) return
+    const handler = (e) => { if (e.key === 'Escape') setDemoState(null) }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [demoState])
+
+  // Mettre à jour iframe src quand la vue ou l'app change
+  useEffect(() => {
+    if (!demoState || !iframeRef.current) return
+    const view = demoState.views?.[demoState.activeIdx]
+    if (view?.url) iframeRef.current.src = view.url
+  }, [demoState?.activeIdx, demoState?.app?.id])
+
   const scrollToContact = () => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })
   const handleHeroSubmit = () => {
     if (!heroInput.trim()) return
     if (typeof window !== 'undefined') sessionStorage.setItem('walaup_hero_message', heroInput)
     scrollToContact()
+  }
+
+  function parseDemoViews(raw) {
+    try { return typeof raw === 'string' ? JSON.parse(raw) : (Array.isArray(raw) ? raw : []) }
+    catch { return [] }
+  }
+
+  function openDemo(app) {
+    const views = parseDemoViews(app.demo_views)
+    setDemoState({ app, views, activeIdx: 0, device: 'desktop' })
+  }
+
+  function switchDemoView(idx) {
+    setDemoState(prev => ({ ...prev, activeIdx: idx }))
+  }
+
+  function switchDemoDevice(device) {
+    setDemoState(prev => ({ ...prev, device }))
+  }
+
+  async function handleBuy(app) {
+    if (authChecking) return
+    setAuthChecking(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const appId = String(app.id || '')
+      if (typeof window !== 'undefined') {
+        window.location.href = session
+          ? `/client?app_id=${appId}&action=buy`
+          : `/login?app_id=${appId}&action=buy`
+      }
+    } catch (_) {
+      if (typeof window !== 'undefined') window.location.href = '/login?action=buy'
+    } finally {
+      setAuthChecking(false)
+    }
   }
 
   const t        = testimonials[testimonialIdx]
@@ -364,6 +437,118 @@ export default function Home() {
           .mk-grid{grid-template-columns:1fr 1fr!important}
         }
         @media(max-width:480px){.sol-grid,.why-grid,.mk-grid,.pain-grid{grid-template-columns:1fr!important}}
+
+        /* ── Marketplace Cards ── */
+        @keyframes lp-shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(160%)} }
+        @keyframes lp-overlay-in { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+
+        .lp-mp-card {
+          position:relative; border-radius:18px; overflow:hidden;
+          background:rgba(13,17,32,0.45)!important;
+          backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+          border:1px solid rgba(255,255,255,0.08)!important;
+          padding:0!important;
+          transition:transform 320ms cubic-bezier(0.16,1,0.3,1), border-color 280ms ease, box-shadow 280ms ease;
+        }
+        .lp-mp-card:hover {
+          transform:translateY(-5px);
+          border-color:rgba(99,102,241,0.38)!important;
+          box-shadow:0 16px 52px rgba(99,102,241,0.18), 0 4px 16px rgba(0,0,0,0.5);
+        }
+        .lp-mp-thumb {
+          position:relative; height:172px; overflow:hidden;
+          border-bottom:1px solid rgba(255,255,255,0.07);
+        }
+        .lp-mp-thumb img { width:100%; height:100%; object-fit:cover; display:block; transition:transform 400ms ease; }
+        .lp-mp-card:hover .lp-mp-thumb img { transform:scale(1.04); }
+        .lp-mp-shimmer {
+          position:absolute; inset:0;
+          background:linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.07) 50%, transparent 100%);
+          transform:translateX(-100%); pointer-events:none;
+        }
+        .lp-mp-card:hover .lp-mp-shimmer { animation:lp-shimmer 750ms ease 1; }
+        .lp-mp-badge {
+          position:absolute; top:10px;
+          font-size:10px; font-weight:700;
+          padding:3px 10px; border-radius:20px;
+          backdrop-filter:blur(10px); letter-spacing:0.05em; z-index:2;
+        }
+        .lp-mp-badge-cat { left:10px; }
+        .lp-mp-badge-own { right:10px; }
+        .lp-mp-body { padding:18px 20px 20px; }
+        .lp-mp-name { font-family:var(--font-display); font-size:15px; font-weight:700; color:var(--tx); margin-bottom:5px; line-height:1.3; }
+        .lp-mp-tagline { font-size:12px; color:var(--tx-2); line-height:1.55; margin-bottom:16px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .lp-mp-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+        .lp-mp-price  { font-family:var(--font-mono); font-size:14px; font-weight:700; color:var(--gold); flex-shrink:0; }
+        .lp-mp-btn-demo {
+          padding:7px 13px; border-radius:8px;
+          border:1px solid rgba(99,102,241,0.4); background:rgba(99,102,241,0.1);
+          color:var(--ac); font-size:12px; font-weight:600;
+          cursor:pointer; transition:all 200ms ease; font-family:var(--font-body); white-space:nowrap;
+        }
+        .lp-mp-btn-demo:hover { background:rgba(99,102,241,0.22); border-color:var(--ac); }
+        .lp-mp-btn-buy {
+          padding:7px 13px; border-radius:8px; border:none;
+          background:linear-gradient(135deg,var(--ac),var(--ac-2));
+          color:#fff; font-size:12px; font-weight:600;
+          cursor:pointer; transition:opacity 200ms ease; font-family:var(--font-body); white-space:nowrap;
+        }
+        .lp-mp-btn-buy:hover { opacity:0.86; }
+        .lp-mp-btn-buy:disabled { opacity:0.55; cursor:not-allowed; }
+
+        /* ── Demo Overlay ── */
+        .lp-demo-overlay {
+          position:fixed; inset:0; z-index:9000;
+          display:flex; flex-direction:column;
+          background:rgba(8,11,20,0.94);
+          backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+          animation:lp-overlay-in 260ms cubic-bezier(0.16,1,0.3,1) forwards;
+        }
+        .lp-demo-topbar {
+          display:flex; align-items:center; gap:12px;
+          padding:12px 20px; border-bottom:1px solid var(--border); flex-shrink:0;
+        }
+        .lp-demo-views-bar {
+          display:flex; gap:6px; padding:8px 20px;
+          border-bottom:1px solid var(--border); flex-shrink:0; overflow-x:auto;
+        }
+        .lp-demo-view-btn {
+          padding:5px 14px; border-radius:8px;
+          border:1px solid var(--border); background:transparent;
+          color:var(--tx-2); font-size:12px; cursor:pointer;
+          font-family:var(--font-body); transition:all 200ms ease; white-space:nowrap;
+        }
+        .lp-demo-view-btn.active { background:var(--ac-glow); border-color:var(--border-accent); color:var(--tx); }
+        .lp-demo-content {
+          flex:1; display:flex; align-items:center; justify-content:center;
+          overflow:hidden; padding:20px;
+        }
+        .lp-demo-device-btn {
+          padding:7px 9px; border-radius:8px;
+          border:1px solid var(--border); background:transparent;
+          color:var(--tx-3); cursor:pointer;
+          display:flex; align-items:center; justify-content:center;
+          transition:all 200ms ease;
+        }
+        .lp-demo-device-btn.active { background:var(--bg-surface); border-color:var(--border-strong); color:var(--tx); }
+        .lp-demo-phone-frame {
+          width:390px; height:100%; max-height:780px;
+          border-radius:36px; overflow:hidden;
+          border:2px solid var(--border-strong);
+          box-shadow:0 0 60px rgba(99,102,241,0.15), 0 32px 80px rgba(0,0,0,0.6);
+        }
+        .lp-demo-desktop-frame {
+          width:100%; height:100%; border-radius:14px; overflow:hidden;
+          border:1px solid var(--border-strong);
+          box-shadow:0 0 60px rgba(99,102,241,0.1), 0 16px 48px rgba(0,0,0,0.5);
+        }
+        .lp-demo-iframe { width:100%; height:100%; border:none; display:block; }
+
+        @media(max-width:640px) {
+          .lp-demo-phone-frame { width:320px; }
+          .lp-demo-content { padding:10px; }
+          .lp-demo-topbar { padding:10px 14px; gap:8px; }
+        }
       `}</style>
 
       {/* ══ 1. HERO ══════════════════════════════════════════════════ */}
@@ -583,26 +768,90 @@ export default function Home() {
             <h2 style={H2}>Apps créées, prêtes à déployer</h2>
             <p style={{ fontSize:16, color:'var(--tx-2)' }}>Achetez-en une et on l'adapte à votre business en 48h.</p>
           </div>
-          <div className="mk-grid" data-stagger style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:18, marginBottom:40 }}>
-            {(marketplaceApps.length>0 ? marketplaceApps : SOLUTIONS.slice(0,3)).map((app,i) => {
-              const Sol = SOLUTIONS[i]
+
+          <div className="mk-grid" data-stagger style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:20, marginBottom:40 }}>
+            {(marketplaceApps.length > 0 ? marketplaceApps : MP_FALLBACK).map(app => {
+              const cat     = CAT_MAP[app.category] || CAT_DEFAULT
+              const views   = parseDemoViews(app.demo_views)
+              const hasDemo = views.length > 0
+
               return (
-                <div key={app.id||app.name} data-animate className="card card--interactive card--tilt" style={{ padding:24 }}>
-                  <div style={{ width:48, height:48, borderRadius:14, background:`${Sol?.color||'var(--ac)'}18`, border:`1px solid ${Sol?.color||'var(--ac)'}40`, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:14 }}>
-                    {Sol ? <Sol.Icon size={22} color={Sol.color} strokeWidth={1.8}/> : <Store size={22} color="var(--ac)"/>}
+                <div key={app.id || app.name} data-animate className="card lp-mp-card card--tilt">
+
+                  {/* Thumbnail */}
+                  <div className="lp-mp-thumb">
+                    {app.thumbnail_url ? (
+                      <img
+                        ref={el => { if (el) el.src = app.thumbnail_url }}
+                        alt={app.name}
+                        style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}
+                      />
+                    ) : (
+                      <div style={{ width:'100%', height:'100%', background:`linear-gradient(${cat.grad})`, display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+                        <div style={{ position:'absolute', inset:0, opacity:0.08, backgroundImage:`url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` }} />
+                        <span style={{ fontSize:54, filter:'drop-shadow(0 6px 16px rgba(0,0,0,0.6))', position:'relative', zIndex:1 }}>
+                          {app.icon || '📱'}
+                        </span>
+                      </div>
+                    )}
+                    <div className="lp-mp-shimmer" />
+
+                    {/* Badge catégorie */}
+                    {app.category && (
+                      <div className="lp-mp-badge lp-mp-badge-cat" style={{ background:'rgba(0,0,0,0.60)', border:`1px solid ${cat.tx}45`, color:cat.tx }}>
+                        {app.category}
+                      </div>
+                    )}
+
+                    {/* Badge owner */}
+                    <div className="lp-mp-badge lp-mp-badge-own" style={{
+                      background: app.owner_type === 'partner' ? 'rgba(245,158,11,0.18)' : 'rgba(99,102,241,0.18)',
+                      border:     app.owner_type === 'partner' ? '1px solid rgba(245,158,11,0.45)' : '1px solid rgba(99,102,241,0.45)',
+                      color:      app.owner_type === 'partner' ? 'var(--gold)' : 'var(--ac)',
+                    }}>
+                      {app.owner_type === 'partner' ? '🟡 Partenaire' : '🔵 Walaup'}
+                    </div>
                   </div>
-                  <h3 style={{ fontFamily:'var(--font-display)', fontSize:15, fontWeight:700, color:'var(--tx)', marginBottom:8 }}>{app.name}</h3>
-                  {(app.tagline||app.description) && <p style={{ fontSize:13, color:'var(--tx-2)', marginBottom:16, lineHeight:1.5 }}>{(app.tagline||app.description||'').slice(0,90)}{(app.description||'').length>90?'...':''}</p>}
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:8 }}>
-                    {app.price_from ? <span style={{ fontFamily:'var(--font-mono)', fontSize:14, fontWeight:700, color:'var(--gold)' }}>dès {app.price_from} DT</span> : <span style={{ fontSize:13, color:'var(--tx-3)' }}>Prix sur demande</span>}
-                    <Link href="/marketplace" style={{ fontSize:13, color:'var(--ac)', textDecoration:'none', fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>Voir <ChevronRight size={13}/></Link>
+
+                  {/* Body */}
+                  <div className="lp-mp-body">
+                    <div className="lp-mp-name">{app.name}</div>
+                    {(app.tagline || app.description) && (
+                      <div className="lp-mp-tagline">{app.tagline || app.description}</div>
+                    )}
+                    <div className="lp-mp-footer">
+                      <div className="lp-mp-price">
+                        {app.price_from ? `Dès ${app.price_from} DT` : 'Sur demande'}
+                      </div>
+                      <div style={{ display:'flex', gap:6 }}>
+                        {hasDemo && (
+                          <button
+                            className="lp-mp-btn-demo"
+                            onClick={() => { WalaupSound?.click?.(); openDemo(app) }}
+                          >
+                            Voir démo
+                          </button>
+                        )}
+                        <button
+                          className="lp-mp-btn-buy"
+                          onClick={() => handleBuy(app)}
+                          disabled={authChecking}
+                        >
+                          Commander
+                        </button>
+                      </div>
+                    </div>
                   </div>
+
                 </div>
               )
             })}
           </div>
+
           <div style={{ textAlign:'center' }}>
-            <Link href="/marketplace" className="btn btn-ghost" style={{ display:'inline-flex', alignItems:'center', gap:6 }}>Voir toutes nos applications <ArrowRight size={15}/></Link>
+            <Link href="/marketplace" className="btn btn-ghost" style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+              Voir toutes nos applications <ArrowRight size={15}/>
+            </Link>
           </div>
         </div>
       </section>
@@ -705,6 +954,115 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* ── Demo Overlay ─────────────────────────────────────────────── */}
+      {demoState && (() => {
+        const { app, views, activeIdx, device } = demoState
+        const currentView = views[activeIdx]
+        return (
+          <div
+            className="lp-demo-overlay"
+            onClick={e => { if (e.target === e.currentTarget) setDemoState(null) }}
+          >
+            {/* Top bar */}
+            <div className="lp-demo-topbar">
+              <span style={{ fontSize:22 }}>{app.icon || '📱'}</span>
+              <span style={{ fontFamily:'var(--font-display)', fontWeight:700, color:'var(--tx)', fontSize:15, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 }}>
+                {app.name}
+              </span>
+              {currentView && (
+                <span style={{ fontSize:12, color:'var(--tx-3)', flexShrink:0 }}>· {currentView.label}</span>
+              )}
+
+              {/* Device toggle */}
+              {currentView && (
+                <div style={{ display:'flex', gap:4, flexShrink:0 }}>
+                  <button className={`lp-demo-device-btn${device==='desktop'?' active':''}`} onClick={() => switchDemoDevice('desktop')} title="Vue desktop">
+                    <Monitor size={16}/>
+                  </button>
+                  <button className={`lp-demo-device-btn${device==='mobile'?' active':''}`} onClick={() => switchDemoDevice('mobile')} title="Vue mobile">
+                    <Smartphone size={16}/>
+                  </button>
+                </div>
+              )}
+
+              {/* Commander CTA */}
+              <button
+                className="lp-mp-btn-buy"
+                onClick={() => { setDemoState(null); handleBuy(app) }}
+                style={{ fontSize:13, padding:'8px 16px', flexShrink:0 }}
+              >
+                Commander →
+              </button>
+
+              {/* Close */}
+              <button
+                onClick={() => setDemoState(null)}
+                style={{ width:34, height:34, borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--tx-2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 200ms ease', flexShrink:0 }}
+              >
+                <X size={15}/>
+              </button>
+            </div>
+
+            {/* View tabs */}
+            {views.length > 1 && (
+              <div className="lp-demo-views-bar">
+                {views.map((v, i) => (
+                  <button
+                    key={v.label || i}
+                    className={`lp-demo-view-btn${activeIdx===i?' active':''}`}
+                    onClick={() => { WalaupSound?.tab?.(); switchDemoView(i) }}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Content */}
+            <div className="lp-demo-content">
+              {currentView ? (
+                device === 'mobile' ? (
+                  <div className="lp-demo-phone-frame">
+                    <iframe
+                      ref={el => { iframeRef.current = el; if (el && currentView.url) el.src = currentView.url }}
+                      className="lp-demo-iframe"
+                      sandbox="allow-scripts allow-forms allow-popups"
+                      title={`Démo ${app.name}`}
+                    />
+                  </div>
+                ) : (
+                  <div className="lp-demo-desktop-frame">
+                    <iframe
+                      ref={el => { iframeRef.current = el; if (el && currentView.url) el.src = currentView.url }}
+                      className="lp-demo-iframe"
+                      sandbox="allow-scripts allow-forms allow-popups"
+                      title={`Démo ${app.name}`}
+                    />
+                  </div>
+                )
+              ) : (
+                <div style={{ textAlign:'center', padding:'40px 20px' }}>
+                  <div style={{ fontSize:52, marginBottom:18 }}>{app.icon || '📱'}</div>
+                  <div style={{ fontFamily:'var(--font-display)', fontSize:22, fontWeight:700, color:'var(--tx)', marginBottom:10 }}>
+                    Démo non disponible
+                  </div>
+                  <p style={{ color:'var(--tx-2)', marginBottom:28, maxWidth:360, margin:'0 auto 28px' }}>
+                    Contactez-nous pour une démonstration personnalisée de cette application.
+                  </p>
+                  <button
+                    className="lp-mp-btn-buy"
+                    onClick={() => { setDemoState(null); scrollToContact() }}
+                    style={{ fontSize:14, padding:'11px 24px' }}
+                  >
+                    Demander une démo gratuite
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
     </>
   )
 }
