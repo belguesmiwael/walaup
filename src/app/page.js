@@ -77,6 +77,29 @@ const PACKS = [
 
 const CHIPS = ['App Café', 'App Stock', 'App Livraison', 'App Dettes', 'App Crèche', 'App Médecin']
 
+// ─── Fusionner tarifs admin dans les packs landing ────────────────────────────
+function buildDisplayPacks(tarifs) {
+  if (!tarifs) return PACKS
+  return PACKS.map(pack => {
+    const key = pack.name.toLowerCase()  // 'essentiel' | 'pro' | 'partenaire'
+    const cfg = tarifs[key]
+    if (!cfg) return pack
+    const price = key === 'partenaire'
+      ? (cfg.one_time        ? String(cfg.one_time)        : pack.price)
+      : (cfg.annual          ? String(cfg.annual)          : pack.price)
+    const monthly = key === 'partenaire'
+      ? (cfg.monthly_support ? String(cfg.monthly_support) : pack.monthly)
+      : (cfg.monthly         ? String(cfg.monthly)         : pack.monthly)
+    return {
+      ...pack,
+      price,
+      monthly,
+      features: cfg.features?.length     ? cfg.features  : pack.features,
+      excluded: cfg.excluded !== undefined ? cfg.excluded : pack.excluded,
+    }
+  })
+}
+
 // ─── Marketplace constants ─────────────────────────────────────────────────────
 
 const CAT_MAP = {
@@ -322,13 +345,19 @@ export default function Home() {
   const [marketplaceApps, setMarketplaceApps] = useState([])
   const [demoState, setDemoState]             = useState(null) // { app, views, activeIdx, device }
   const [authChecking, setAuthChecking]       = useState(false)
+  const [loadedTarifs, setLoadedTarifs]       = useState(null)
   const iframeRef = useRef(null)
+
+  // displayPacks : PACKS fusionnes avec tarifs depuis admin config
+  const displayPacks = buildDisplayPacks(loadedTarifs)
 
   useEffect(() => {
     supabase.from('testimonials').select('*').eq('active', true).limit(6)
       .then(({ data }) => { if (data?.length) setTestimonials(data) })
     supabase.from('marketplace_apps').select('*').eq('active', true).limit(3)
       .then(({ data }) => { if (data?.length) setMarketplaceApps(data.sort((a,b) => (a.sort_order||0)-(b.sort_order||0))) })
+    supabase.from('config').select('value').eq('key', 'tarifs').maybeSingle()
+      .then(({ data }) => { if (data?.value) setLoadedTarifs(data.value) })
   }, [])
 
   useEffect(() => {
@@ -944,7 +973,7 @@ export default function Home() {
             <p style={{ fontSize:16, color:'var(--tx-2)' }}>Du simple usage privé jusqu'à transformer votre app en source de revenus.</p>
           </div>
           <div className="packs-grid" data-stagger style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:20, marginBottom:20 }}>
-            {PACKS.map(pack => (
+            {displayPacks.map(pack => (
               <div key={pack.name} data-animate style={{ position:'relative', display:'flex', flexDirection:'column' }}>
                 {pack.badge && <div style={{ position:'absolute', top:-13, left:'50%', transform:'translateX(-50%)', background:pack.badgeBg, color:pack.badgeTx, fontSize:11, fontWeight:700, padding:'4px 16px', borderRadius:20, whiteSpace:'nowrap', zIndex:2 }}>{pack.badge}</div>}
                 <div className="card" style={{ padding:'32px 24px', flex:1, display:'flex', flexDirection:'column', border:pack.name==='Pro'?'1px solid rgba(139,92,246,0.45)':pack.name==='Partenaire'?'1px solid rgba(245,158,11,0.35)':'1px solid var(--border)', background:pack.name==='Pro'?'linear-gradient(160deg,rgba(99,102,241,.06),rgba(139,92,246,.04))':pack.name==='Partenaire'?'linear-gradient(160deg,rgba(245,158,11,.05),rgba(251,191,36,.03))':undefined }}>
