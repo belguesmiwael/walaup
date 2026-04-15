@@ -346,9 +346,7 @@ export default function Home() {
   const [demoState, setDemoState]             = useState(null) // { app, views, activeIdx, device }
   const [authChecking, setAuthChecking]       = useState(false)
   const [loadedTarifs, setLoadedTarifs]       = useState(null)
-  const iframeRef   = useRef(null)
-  const auroraRef   = useRef(null)
-  const [scrollPct, setScrollPct] = useState(0)
+  const iframeRef = useRef(null)
 
   // displayPacks : PACKS fusionnes avec tarifs depuis admin config
   const displayPacks = buildDisplayPacks(loadedTarifs)
@@ -386,46 +384,6 @@ export default function Home() {
     const view = demoState.views?.[demoState.activeIdx]
     if (view?.url) iframeRef.current.src = view.url
   }, [demoState?.activeIdx, demoState?.app?.id])
-
-  // Aurora mouse tracking — desktop only, SSR-safe
-  useEffect(() => {
-    if (typeof window === 'undefined' || window.innerWidth < 768) return
-    const orb = auroraRef.current
-    if (!orb) return
-    let raf
-    const onMove = e => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => {
-        const dx = ((e.clientX - window.innerWidth  / 2) / window.innerWidth)  * 30
-        const dy = ((e.clientY - window.innerHeight / 2) / window.innerHeight) * 20
-        orb.style.transform = `translate(${dx}px,${dy}px)`
-      })
-    }
-    window.addEventListener('mousemove', onMove, { passive: true })
-    return () => { window.removeEventListener('mousemove', onMove); cancelAnimationFrame(raf) }
-  }, [])
-
-  // Scroll progress bar
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const onScroll = () => {
-      const h = document.documentElement.scrollHeight - window.innerHeight
-      setScrollPct(h > 0 ? Math.min(100, (window.scrollY / h) * 100) : 0)
-    }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
-  // Directional reveal observer
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const obs = new IntersectionObserver(
-      entries => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('wl-in'); obs.unobserve(e.target) } }),
-      { threshold: 0.1 }
-    )
-    document.querySelectorAll('[data-dir]').forEach(el => obs.observe(el))
-    return () => obs.disconnect()
-  }, [])
 
   const scrollToContact = () => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })
   const handleHeroSubmit = () => {
@@ -490,26 +448,15 @@ export default function Home() {
       <style>{`
         @keyframes wFadeUp       { from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)} }
         @keyframes wPulse        { 0%,100%{opacity:1}50%{opacity:.35} }
+        @keyframes wFloat        { 0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)} }
         @keyframes wProgressFill { from{width:0}to{width:100%} }
         @keyframes wGlowPulse    { 0%,100%{box-shadow:0 0 20px rgba(99,102,241,.3)}50%{box-shadow:0 0 40px rgba(99,102,241,.55)} }
-
-        /* ── Scroll progress bar ── */
-        .wp-prog-bar  { position:fixed; left:0; top:0; width:3px; height:100vh; z-index:9999; pointer-events:none; background:rgba(255,255,255,0.04); }
-        .wp-prog-fill { width:100%; background:linear-gradient(180deg,var(--ac) 0%,var(--ac-2) 100%); box-shadow:0 0 10px rgba(99,102,241,0.55); border-radius:0 0 2px 2px; }
-
-        /* ── Directional reveal ── */
-        [data-dir]          { opacity:0; transition:opacity 600ms cubic-bezier(0.16,1,0.3,1), transform 600ms cubic-bezier(0.16,1,0.3,1); }
-        [data-dir="left"]   { transform:translateX(-36px); }
-        [data-dir="right"]  { transform:translateX(36px); }
-        [data-dir="up"]     { transform:translateY(28px); }
-        [data-dir="down"]   { transform:translateY(-16px); }
-        [data-dir].wl-in    { opacity:1!important; transform:none!important; }
         .chip-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--tx-2);font-size:13px;cursor:pointer;transition:all 200ms ease;font-family:var(--font-body)}
         .chip-btn:hover{border-color:var(--ac);color:var(--tx);background:var(--ac-glow)}
         @media(max-width:768px){
           .hero-grid,.auth-grid{grid-template-columns:1fr!important}
           .hero-right{display:none!important}
-          .pain-grid{grid-template-columns:1fr 1fr!important}
+          .sol-grid,.pain-grid{grid-template-columns:1fr 1fr!important}
           .why-grid{grid-template-columns:1fr 1fr!important}
           .packs-grid{grid-template-columns:1fr!important}
           .stats-grid{grid-template-columns:1fr 1fr!important}
@@ -517,11 +464,8 @@ export default function Home() {
           .step-line{display:none!important}
           .auth-grid{gap:40px!important}
           .mk-grid{grid-template-columns:1fr 1fr!important}
-          .sol-featured{flex-direction:column!important;gap:18px!important}
-          .sol-secondary{grid-template-columns:repeat(2,1fr)!important}
-          .wp-prog-bar{display:none}
         }
-        @media(max-width:480px){.why-grid,.mk-grid,.pain-grid{grid-template-columns:1fr!important}.sol-secondary{grid-template-columns:1fr!important}}
+        @media(max-width:480px){.sol-grid,.why-grid,.mk-grid,.pain-grid{grid-template-columns:1fr!important}}
 
         /* ── Marketplace Cards ── */
         @keyframes lp-shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(160%)} }
@@ -549,11 +493,10 @@ export default function Home() {
           transition:transform 320ms cubic-bezier(0.16,1,0.3,1), border-color 280ms ease, box-shadow 280ms ease;
         }
         .lp-mp-card:hover {
-          border-color:rgba(99,102,241,0.60)!important;
-          box-shadow:0 0 0 1px rgba(99,102,241,0.22), 0 12px 48px rgba(99,102,241,0.18), 0 4px 16px rgba(0,0,0,0.5);
+          transform:translateY(-5px);
+          border-color:rgba(99,102,241,0.38)!important;
+          box-shadow:0 16px 52px rgba(99,102,241,0.18), 0 4px 16px rgba(0,0,0,0.5);
         }
-        .lp-mp-body { transition:transform 300ms cubic-bezier(0.16,1,0.3,1); }
-        .lp-mp-card:hover .lp-mp-body { transform:rotate(0.5deg) translateY(-1px); }
         .lp-mp-thumb {
           position:relative; height:172px; overflow:hidden;
           border-bottom:1px solid rgba(255,255,255,0.07);
@@ -676,24 +619,15 @@ export default function Home() {
         }
       `}</style>
 
-      {/* ── Scroll Progress Bar ─────────────────────────────────────────── */}
-      <div className="wp-prog-bar" aria-hidden="true">
-        <div className="wp-prog-fill" style={{ height:`${scrollPct}%` }} />
-      </div>
-
       {/* ══ 1. HERO ══════════════════════════════════════════════════ */}
       <section style={{ paddingTop:'calc(var(--nav-h,68px) + 64px)', paddingBottom:80, position:'relative', overflow:'hidden' }}>
-        <div className="aurora-bg">
-          <div ref={auroraRef} className="aurora-orb--1" style={{ transition:'transform 900ms cubic-bezier(0.16,1,0.3,1)' }}/>
-          <div className="aurora-orb--2"/>
-        </div>
+        <div className="aurora-bg"><div className="aurora-orb--1"/><div className="aurora-orb--2"/></div>
         <div className="container">
-          <div className="hero-grid" style={{ display:'grid', gridTemplateColumns:'7fr 5fr', gap:56, alignItems:'center' }}>
-            <div>
+          <div className="hero-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:64, alignItems:'center' }}>
+            <div style={{ animation:'wFadeUp 600ms ease forwards' }}>
               {tag(Zap, 'Agence Apps N°1 Tunisie')}
-              <h1 style={{ fontFamily:'var(--font-display)', fontSize:'clamp(2.8rem,6.5vw,6.5rem)', fontWeight:800, lineHeight:1.02, letterSpacing:'-0.03em', color:'var(--tx)', marginBottom:20 }}>
-                Décrivez votre<br />business<span style={{ color:'var(--ac)' }}>.</span><br />
-                <span className="text-gradient-ac" style={{ fontSize:'0.62em', fontWeight:700, letterSpacing:'-0.01em' }}>On crée votre app.</span>
+              <h1 style={{ fontFamily:'var(--font-display)', fontSize:'clamp(2rem,4.5vw,3.6rem)', fontWeight:700, lineHeight:1.08, color:'var(--tx)', marginBottom:20 }}>
+                Décrivez votre business,<br /><span className="text-gradient-ac">on crée votre application</span>
               </h1>
               <p style={{ fontSize:'clamp(1rem,1.4vw,1.15rem)', color:'var(--tx-2)', lineHeight:1.65, marginBottom:32 }}>
                 Quelques mots suffisent. Notre équipe transforme votre idée en app sur mesure —{' '}
@@ -714,16 +648,21 @@ export default function Home() {
               <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:36 }}>
                 {CHIPS.map(chip => <button key={chip} className="chip-btn" onClick={() => setHeroInput(chip)}>{chip}</button>)}
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:0 }}>
-                {[{val:'50+',label:'clients'},{val:'48h',label:'délai démo'},{val:'0 DT',label:'avant paiement'}].map((s,i) => (
-                  <div key={s.val} style={{ paddingRight:24, paddingLeft:i>0?24:0, borderLeft:i>0?'1px solid var(--border-strong)':'none' }}>
-                    <div style={{ fontFamily:'var(--font-mono)', fontSize:16, fontWeight:700, color:'var(--tx)', lineHeight:1 }}>{s.val}</div>
-                    <div style={{ fontSize:10, color:'var(--tx-3)', marginTop:4, letterSpacing:'0.08em', textTransform:'uppercase' }}>{s.label}</div>
-                  </div>
-                ))}
+              <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+                <div style={{ display:'flex' }}>
+                  {['#6366F1','#10B981','#F59E0B','#EC4899'].map((c,i) => (
+                    <div key={i} style={{ width:34, height:34, borderRadius:'50%', background:c, marginLeft:i?-10:0, border:'2.5px solid var(--bg-base)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', fontFamily:'var(--font-display)', zIndex:4-i }}>
+                      {['K','S','A','M'][i]}
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:600, color:'var(--tx)' }}>+20 clients font confiance</div>
+                  <div style={{ fontSize:12, color:'var(--tx-3)' }}>à Walaup en Tunisie</div>
+                </div>
               </div>
             </div>
-            <div className="hero-right">
+            <div className="hero-right" style={{ animation:'wFloat 6s ease-in-out infinite', animationDelay:'0.3s' }}>
               <HeroLivePreview />
             </div>
           </div>
@@ -752,21 +691,13 @@ export default function Home() {
             <h2 style={H2}>Ces problèmes vous coûtent du temps<br />et de l'argent</h2>
             <p style={{ fontSize:16, color:'var(--tx-2)', maxWidth:520, margin:'0 auto' }}>Si vous avez répondu oui à l'un de ces problèmes, on a la solution.</p>
           </div>
-          <div className="pain-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:18 }}>
-            {PAIN_POINTS.map(({ Icon, title, desc }, i) => (
-              <div
-                key={title}
-                data-dir={i % 2 === 0 ? 'left' : 'right'}
-                style={{ transitionDelay:`${i * 60}ms` }}
-                className="card card--interactive"
-              >
-                <div style={{ padding:'22px 24px' }}>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-                    <span style={{ fontFamily:'var(--font-mono)', fontSize:10, fontWeight:700, color:'var(--tx-3)', letterSpacing:'0.12em', textTransform:'uppercase' }}>
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                    <Icon size={15} color="var(--ac)" strokeWidth={1.6} />
-                  </div>
+          <div className="pain-grid" data-stagger style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:18 }}>
+            {PAIN_POINTS.map(({ Icon, title, desc }) => (
+              <div key={title} data-animate className="card card--interactive" style={{ padding:22, display:'flex', gap:14 }}>
+                <div style={{ width:40, height:40, borderRadius:10, background:'var(--ac-glow)', border:'1px solid var(--border-accent)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <Icon size={18} color="var(--ac)" strokeWidth={1.8} />
+                </div>
+                <div>
                   <h3 style={{ fontFamily:'var(--font-display)', fontSize:15, fontWeight:700, color:'var(--tx)', marginBottom:6 }}>{title}</h3>
                   <p style={{ fontSize:13, color:'var(--tx-2)', lineHeight:1.55 }}>{desc}</p>
                 </div>
@@ -784,51 +715,22 @@ export default function Home() {
             <h2 style={H2}>Une application 100% adaptée<br />à votre business</h2>
             <p style={{ fontSize:16, color:'var(--tx-2)' }}>Pas un template générique. Construite uniquement pour vous.</p>
           </div>
-          <div style={{ marginBottom:40 }}>
-            {/* Featured solution — pleine largeur */}
-            {(() => { const { Icon, name, features, color } = SOLUTIONS[0]; return (
-              <div data-dir="down" className="card card--interactive sol-featured" style={{ marginBottom:18, padding:'28px 32px', display:'flex', gap:32, alignItems:'flex-start' }}>
-                <div style={{ flexShrink:0, paddingTop:4 }}>
-                  <Icon size={36} color={color} strokeWidth={1.4} />
+          <div className="sol-grid" data-stagger style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:18, marginBottom:40 }}>
+            {SOLUTIONS.map(({ Icon, name, features, color }) => (
+              <div key={name} data-animate className="card card--interactive card--tilt" style={{ padding:24 }}>
+                <div style={{ width:48, height:48, borderRadius:14, background:`${color}18`, border:`1px solid ${color}40`, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:14 }}>
+                  <Icon size={22} color={color} strokeWidth={1.8} />
                 </div>
-                <div style={{ flex:1 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-                    <h3 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:700, color:'var(--tx)', lineHeight:1.2 }}>{name}</h3>
-                    <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--tx-3)', letterSpacing:'0.1em', marginTop:2 }}>01</span>
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:'6px 24px' }}>
-                    {features.map(f => (
-                      <div key={f} style={{ fontSize:13, color:'var(--tx-2)', display:'flex', alignItems:'center', gap:8, lineHeight:1.5 }}>
-                        <span style={{ width:4, height:4, borderRadius:'50%', background:color, flexShrink:0 }} />{f}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <h3 style={{ fontFamily:'var(--font-display)', fontSize:15, fontWeight:700, color:'var(--tx)', marginBottom:12 }}>{name}</h3>
+                <ul style={{ listStyle:'none', padding:0, margin:0 }}>
+                  {features.map(f => (
+                    <li key={f} style={{ fontSize:13, color:'var(--tx-2)', marginBottom:6, display:'flex', alignItems:'center', gap:7 }}>
+                      <CheckCircle2 size={12} color={color} strokeWidth={2.5} style={{ flexShrink:0 }} />{f}
+                    </li>
+                  ))}
+                </ul>
               </div>
-            )})()}
-            {/* Autres solutions — grille 5 colonnes */}
-            <div className="sol-secondary" style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:14 }}>
-              {SOLUTIONS.slice(1).map(({ Icon, name, features, color }, i) => (
-                <div key={name} data-dir="up" style={{ transitionDelay:`${i * 65}ms` }} className="card card--interactive">
-                  <div style={{ padding:'18px 16px' }}>
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-                      <Icon size={17} color={color} strokeWidth={1.6} />
-                      <span style={{ fontFamily:'var(--font-mono)', fontSize:9, color:'var(--tx-3)', letterSpacing:'0.1em' }}>
-                        {String(i + 2).padStart(2, '0')}
-                      </span>
-                    </div>
-                    <h3 style={{ fontFamily:'var(--font-display)', fontSize:13, fontWeight:700, color:'var(--tx)', marginBottom:8, lineHeight:1.3 }}>{name}</h3>
-                    <ul style={{ listStyle:'none', padding:0, margin:0 }}>
-                      {features.map(f => (
-                        <li key={f} style={{ fontSize:11, color:'var(--tx-2)', marginBottom:5, display:'flex', gap:6, alignItems:'flex-start', lineHeight:1.45 }}>
-                          <span style={{ width:3, height:3, borderRadius:'50%', background:color, marginTop:5, flexShrink:0 }} />{f}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
           <div style={{ textAlign:'center' }}>
             <button onClick={scrollToContact} className="btn btn-primary btn-magnetic" style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
@@ -868,11 +770,11 @@ export default function Home() {
             {tag(Shield, 'Notre différence')}
             <h2 style={H2}>Ce qui nous rend différents</h2>
           </div>
-          <div className="why-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:18, marginBottom:44 }}>
-            {WHY_US.map(({ Icon, title, desc }, i) => (
-              <div key={title} data-dir="up" style={{ transitionDelay:`${i * 70}ms`, padding:'26px 18px', textAlign:'center' }} className="card">
-                <div style={{ marginBottom:14, display:'flex', justifyContent:'center' }}>
-                  <Icon size={20} color="var(--ac)" strokeWidth={1.6} />
+          <div className="why-grid" data-stagger style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:18, marginBottom:44 }}>
+            {WHY_US.map(({ Icon, title, desc }) => (
+              <div key={title} data-animate className="card" style={{ padding:'26px 18px', textAlign:'center' }}>
+                <div style={{ width:52, height:52, borderRadius:16, background:'var(--ac-glow)', border:'1px solid var(--border-accent)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
+                  <Icon size={22} color="var(--ac)" strokeWidth={1.8} />
                 </div>
                 <h3 style={{ fontFamily:'var(--font-display)', fontSize:14, fontWeight:700, color:'var(--tx)', marginBottom:8 }}>{title}</h3>
                 <p style={{ fontSize:13, color:'var(--tx-2)', lineHeight:1.55 }}>{desc}</p>
@@ -976,7 +878,7 @@ export default function Home() {
                     <div className="lp-mp-thumb-overlay" />
 
                     {/* Emoji icône centré (toujours affiché par-dessus) */}
-                    
+                    <span className="lp-mp-thumb-emoji">{app.icon || '📱'}</span>
 
                     <div className="lp-mp-shimmer" />
 
