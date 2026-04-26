@@ -6,7 +6,7 @@ import {
   Clock, AlertCircle, CheckCircle2, Heart,
   Phone, MapPin, ChevronRight, RefreshCw
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseMedical } from '@/lib/supabase'
 
 const CSS = `
   .pt-root { position:fixed; inset:0; display:flex; flex-direction:column; background:var(--bg-base); overflow:hidden; }
@@ -140,7 +140,7 @@ export default function PatientPortal() {
         setUser({ ...u, ...userData })
 
         // Charger le dossier patient lié au compte
-        const { data: pt } = await supabase.schema('medical').from('patients')
+        const { data: pt } = await supabaseMedical.from('patients')
           .select('*').eq('user_id', u.id).maybeSingle()
         setPatient(pt)
       } catch { router.push('/apps/medical/login') }
@@ -153,7 +153,7 @@ export default function PatientPortal() {
     if (!patient) return
     setLoadingAppts(true)
     try {
-      const { data } = await supabase.schema('medical').from('appointments')
+      const { data } = await supabaseMedical.from('appointments')
         .select('id, scheduled_at, duration_min, type, status, reason')
         .eq('patient_id', patient.id)
         .order('scheduled_at', { ascending: false })
