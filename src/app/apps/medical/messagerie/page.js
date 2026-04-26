@@ -178,13 +178,18 @@ function Inner(){
   async function startRec(){
     try{
       const stream=await navigator.mediaDevices.getUserMedia({audio:true})
-      const rec=new MediaRecorder(stream,{mimeType:'audio/webm'})
+      // Détecter le format supporté par le navigateur
+      const mimeType=['audio/webm;codecs=opus','audio/webm','audio/ogg','audio/mp4','']
+        .find(t=>!t||MediaRecorder.isTypeSupported(t))||''
+      const rec=new MediaRecorder(stream,mimeType?{mimeType}:{})
       chunks.current=[]
       rec.ondataavailable=e=>chunks.current.push(e.data)
       rec.onstop=async()=>{
         stream.getTracks().forEach(t=>t.stop())
-        const blob=new Blob(chunks.current,{type:'audio/webm'})
-        await uploadAndSend(new File([blob],`voice_${Date.now()}.webm`,{type:'audio/webm'}))
+        const mime=rec.mimeType||'audio/webm'
+        const ext=mime.includes('ogg')?'ogg':mime.includes('mp4')?'m4a':'webm'
+        const blob=new Blob(chunks.current,{type:mime})
+        await uploadAndSend(new File([blob],`voice_${Date.now()}.${ext}`,{type:mime}))
         setIsRec(false);setRecSec(0);clearInterval(timerRef.current)
       }
       rec.start();recRef.current=rec;setIsRec(true)
