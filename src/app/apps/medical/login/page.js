@@ -257,24 +257,31 @@ export default function MedicalLogin() {
         .eq('id', data.user.id)
         .maybeSingle()
 
-      if (!userData || !userData.is_active) {
-        await supabase.auth.signOut()
+      if (!userData) {
+        // RLS ou user non configuré — on continue quand même avec les infos de base
+        setError('Compte non configuré. Contactez votre administrateur.')
+        setLoading(false)
+        return
+      }
+
+      if (userData.is_active === false) {
         setError('Compte inactif. Contactez votre médecin.')
         setLoading(false)
         return
       }
 
       if (userData.app_type !== 'medical') {
-        await supabase.auth.signOut()
-        setError('Ce compte n\'est pas associé à MediLink OS.')
+        setError("Ce compte n'est pas associé à MediLink OS.")
         setLoading(false)
         return
       }
 
       const redirect = ROLE_REDIRECT[userData.role] || '/apps/medical/patient'
+      setLoading(false)
       router.push(redirect)
 
-    } catch {
+    } catch (err) {
+      console.error('Login error:', err)
       setError('Erreur inattendue. Veuillez réessayer.')
       setLoading(false)
     }
