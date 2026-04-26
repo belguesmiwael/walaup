@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, User, Phone, MapPin, Heart, AlertCircle,
   CalendarDays, FileText, Plus, Clock, CheckCircle2,
-  Stethoscope, Pill, ChevronRight, Edit2, LogOut
+  Stethoscope, Pill, ChevronRight, Edit2, LogOut, MessageSquare, FolderOpen
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -252,6 +252,7 @@ function PatientDetailInner() {
   const patientId    = searchParams.get('id')
 
   const [user,        setUser]        = useState(null)
+  const [doctorName,  setDoctorName]  = useState('')
   const [patient,     setPatient]     = useState(null)
   const [consultations, setConsults]  = useState([])
   const [appointments,  setAppts]     = useState([])
@@ -274,6 +275,7 @@ function PatientDetailInner() {
           router.push('/apps/medical/login'); return
         }
         setUser({ ...u, ...userData })
+        if (userData.full_name) setDoctorName(userData.full_name)
 
         if (!patientId) { router.push('/apps/medical/doctor'); return }
 
@@ -403,6 +405,24 @@ function PatientDetailInner() {
             </div>
           )}
 
+          {/* CTA Message — disponible pour tous */}
+          <div style={{ display:'flex', gap:10, marginBottom:20 }}>
+            {isDoctor && patient.phone && (
+              <a href={`https://wa.me/216${patient.phone.replace(/\D/g,'')}?text=Bonjour ${patient.first_name}, Dr ${doctorName?.split(' ').pop() || ''} ici.`}
+                target="_blank" rel="noreferrer"
+                style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'10px 16px', borderRadius:12, border:'1px solid rgba(37,211,102,.35)', background:'rgba(37,211,102,.08)', color:'#25D366', fontWeight:700, fontSize:'.82rem', textDecoration:'none', transition:'all .2s' }}>
+                <Phone size={15}/> WhatsApp
+              </a>
+            )}
+            {patient.user_id && (
+              <button
+                onClick={() => router.push('/apps/medical/messagerie?contact=' + patient.user_id)}
+                style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'10px 16px', borderRadius:12, border:'1px solid rgba(14,165,233,.35)', background:'rgba(14,165,233,.08)', color:'#0EA5E9', fontWeight:700, fontSize:'.82rem', cursor:'pointer', transition:'all .2s' }}>
+                <MessageSquare size={15}/> Message
+              </button>
+            )}
+          </div>
+
           {/* Informations personnelles */}
           <div className="pd-section">
             <div className="pd-section-header">
@@ -513,6 +533,11 @@ function PatientDetailInner() {
             ))}
           </div>
 
+          {/* Documents patient */}
+          {isDoctor && (
+            <PatientDocuments patientId={patient.id} tenantId={user.tenant_id} />
+          )}
+
           {/* Médicaments en cours */}
           {isDoctor && (patient.current_meds||[]).length > 0 && (
             <div className="pd-section">
@@ -533,6 +558,65 @@ function PatientDetailInner() {
         </div>
       </div>
     </>
+  )
+}
+
+function PatientDocuments({ patientId, tenantId }) {
+  const [files, setFiles] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase.from('med_files')
+        .select('id, file_name, file_type, category, public_url, created_at, description')
+        .eq('patient_id', patientId)
+        .order('created_at', { ascending: false })
+        .limit(20)
+      setFiles(data || [])
+      setLoading(false)
+    }
+    load()
+  }, [patientId])
+
+  if (loading) return null
+  if (files.length === 0) return (
+    <div className="pd-section" style={{ marginBottom:16 }}>
+      <div className="pd-section-header">
+        <div className="pd-section-title"><FolderOpen size={15} color="#0EA5E9"/>Documents ({files.length})</div>
+      </div>
+      <div className="pd-empty-section">Aucun document — les fichiers envoyés dans la messagerie apparaîtront ici</div>
+    </div>
+  )
+
+  return (
+    <div className="pd-section" style={{ marginBottom:16 }}>
+      <div className="pd-section-header">
+        <div className="pd-section-title"><FolderOpen size={15} color="#0EA5E9"/>Documents ({files.length})</div>
+      </div>
+      {files.map(f => (
+        <div key={f.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 18px', borderBottom:'1px solid var(--border)' }}>
+          <div style={{ width:34, height:34, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+            background: f.category==='image' ? 'rgba(14,165,233,.1)' : f.category==='audio' ? 'rgba(99,102,241,.1)' : 'rgba(245,158,11,.1)',
+            color: f.category==='image' ? '#0EA5E9' : f.category==='audio' ? 'var(--ac)' : 'var(--gold)',
+            fontSize:'.7rem', fontWeight:800 }}>
+            {f.category==='image'?'IMG':f.category==='audio'?'MIC':'DOC'}
+          </div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontWeight:600, fontSize:'.83rem', color:'var(--tx)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{f.file_name}</div>
+            <div style={{ fontSize:'.7rem', color:'var(--tx-3)', marginTop:2 }}>
+              {new Date(f.created_at).toLocaleDateString('fr-TN', {day:'2-digit',month:'short',year:'numeric'})}
+              {f.description && ' · ' + f.description}
+            </div>
+          </div>
+          {f.public_url && (
+            <a href={f.public_url} target="_blank" rel="noreferrer"
+              style={{ padding:'4px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-base)', color:'var(--tx-2)', fontSize:'.72rem', fontWeight:600, textDecoration:'none' }}>
+              Ouvrir
+            </a>
+          )}
+        </div>
+      ))}
+    </div>
   )
 }
 

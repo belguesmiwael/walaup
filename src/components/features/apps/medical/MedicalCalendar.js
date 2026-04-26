@@ -253,14 +253,43 @@ export default function MedicalCalendar({ tenantId, userId, userRole, readOnly =
     setForm({ patient_id:'', duration_min:30, type:'presentiel', reason:'' })
   }
 
+  async function createInlinePatient() {
+    if (!newPtForm.first_name.trim() || !newPtForm.last_name.trim()) return null
+    setCreatingPt(true)
+    try {
+      const { data, error } = await supabase.from('med_patients').insert({
+        tenant_id:  tenantId,
+        first_name: newPtForm.first_name.trim().slice(0, 100),
+        last_name:  newPtForm.last_name.trim().slice(0, 100),
+        phone:      newPtForm.phone.trim().slice(0, 20),
+        email:      newPtForm.email.trim().slice(0, 254),
+        allergies:  [], chronic_cond: [], current_meds: [],
+        created_by: userId,
+      }).select('id, first_name, last_name').single()
+      if (error) throw error
+      // Ajouter à la liste patients
+      setPatients(prev => [...prev, data].sort((a,b) => a.last_name.localeCompare(b.last_name)))
+      setForm(f => ({ ...f, patient_id: data.id }))
+      setNewPtMode(false)
+      setNewPtForm({ first_name:'', last_name:'', phone:'', email:'' })
+      return data.id
+    } catch { return null }
+    finally { setCreatingPt(false) }
+  }
+
   async function createAppt(e) {
     e.preventDefault()
-    if (!form.patient_id || !modal) return
+    let patientId = form.patient_id
+    if (newPtMode) {
+      patientId = await createInlinePatient()
+      if (!patientId) { return }
+    }
+    if (!patientId || !modal) return
     setSaving(true)
     try {
       await supabase.from('med_appointments').insert({
         tenant_id:   tenantId,
-        patient_id:  form.patient_id,
+        patient_id:  patientId,
         scheduled_at:modal.date.toISOString(),
         duration_min:Number(form.duration_min),
         type:        form.type,
@@ -405,13 +434,46 @@ export default function MedicalCalendar({ tenantId, userId, userRole, readOnly =
             <form onSubmit={createAppt}>
               <div className="cal-fg">
                 <label className="cal-label">Patient *</label>
-                <select className="cal-select" required value={form.patient_id}
-                  onChange={e => setForm(f => ({...f, patient_id: e.target.value}))}>
-                  <option value="">— Sélectionner un patient —</option>
-                  {patients.map(p => (
-                    <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>
-                  ))}
-                </select>
+                {!newPtMode ? (
+                  <>
+                    <select className="cal-select" value={form.patient_id}
+                      onChange={e => setForm(f => ({...f, patient_id: e.target.value}))}>
+                      <option value="">— Sélectionner un patient —</option>
+                      {patients.map(p => (
+                        <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={() => setNewPtMode(true)} style={{
+                      marginTop:6, background:'none', border:'none', color:'#0EA5E9',
+                      fontSize:'.75rem', fontWeight:700, cursor:'pointer', padding:0,
+                      display:'flex', alignItems:'center', gap:4
+                    }}>+ Nouveau patient (non enregistré)</button>
+                  </>
+                ) : (
+                  <div style={{ background:'rgba(14,165,233,.06)', border:'1px solid rgba(14,165,233,.2)', borderRadius:10, padding:12 }}>
+                    <div style={{ fontSize:'.75rem', fontWeight:700, color:'#0EA5E9', marginBottom:8 }}>Nouveau patient</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                      <input className="cal-input" placeholder="Prénom *" required
+                        value={newPtForm.first_name} maxLength={100}
+                        onChange={e => setNewPtForm(f => ({...f, first_name:e.target.value}))}/>
+                      <input className="cal-input" placeholder="Nom *" required
+                        value={newPtForm.last_name} maxLength={100}
+                        onChange={e => setNewPtForm(f => ({...f, last_name:e.target.value}))}/>
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                      <input className="cal-input" placeholder="Téléphone" type="tel"
+                        value={newPtForm.phone} maxLength={20}
+                        onChange={e => setNewPtForm(f => ({...f, phone:e.target.value}))}/>
+                      <input className="cal-input" placeholder="Email" type="email"
+                        value={newPtForm.email} maxLength={254}
+                        onChange={e => setNewPtForm(f => ({...f, email:e.target.value}))}/>
+                    </div>
+                    <button type="button" onClick={() => setNewPtMode(false)} style={{
+                      marginTop:8, background:'none', border:'none', color:'var(--tx-3)',
+                      fontSize:'.73rem', cursor:'pointer', padding:0
+                    }}>← Patient existant</button>
+                  </div>
+                )}
               </div>
               <div className="cal-modal-row">
                 <div className="cal-fg">
@@ -440,8 +502,8 @@ export default function MedicalCalendar({ tenantId, userId, userRole, readOnly =
               </div>
               <div className="cal-modal-actions">
                 <button type="button" className="cal-btn ghost" onClick={() => setModal(null)}>Annuler</button>
-                <button type="submit" className="cal-btn primary" disabled={saving}>
-                  {saving ? 'Enregistrement…' : 'Créer le RDV'}
+                <button type="submit" className="cal-btn primary" disabled={saving || creatingPt}>
+                  {(saving || creatingPt) ? 'Enregistrement…' : newPtMode ? 'Créer patient & RDV' : 'Créer le RDV'}
                 </button>
               </div>
             </form>
