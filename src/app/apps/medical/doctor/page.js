@@ -8,7 +8,7 @@ import {
   UserPlus, Stethoscope, Video, Lock, TrendingUp, RefreshCw,
   Phone, ChevronRight as Arrow, Moon, Sun, Menu, X
 } from 'lucide-react'
-import { supabase, supabaseMedical } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 
 /* ─── CSS ────────────────────────────────────────────────────────────────── */
 const CSS = `
@@ -633,11 +633,11 @@ export default function DoctorDashboard() {
     try {
       const today = new Date().toISOString().slice(0, 10)
       const [apptRes, ptRes] = await Promise.all([
-        supabaseMedical.from('appointments')
+        supabase.from('med_appointments')
           .select('id, status, type')
           .gte('scheduled_at', `${today}T00:00:00`)
           .lte('scheduled_at', `${today}T23:59:59`),
-        supabaseMedical.from('patients')
+        supabase.from('med_patients')
           .select('id', { count: 'exact', head: true })
           .gte('created_at', `${today}T00:00:00`)
           .lte('created_at', `${today}T23:59:59`)
@@ -662,7 +662,7 @@ export default function DoctorDashboard() {
         .from('appointments')
         .select(`
           id, scheduled_at, duration_min, type, status, reason,
-          patient:patients(id, first_name, last_name, phone, allergies)
+          patient:med_patients(id, first_name, last_name, phone, allergies)
         `)
         .gte('scheduled_at', `${today}T00:00:00`)
         .lte('scheduled_at', `${today}T23:59:59`)
@@ -676,7 +676,7 @@ export default function DoctorDashboard() {
   const loadPatients = useCallback(async (search = '') => {
     setLoadingPatients(true)
     try {
-      let q = supabaseMedical.from('patients')
+      let q = supabase.from('med_patients')
         .select('id, first_name, last_name, birth_date, gender, blood_type, phone, allergies, chronic_cond, last_visit')
         .order('last_name', { ascending: true })
         .limit(40)
@@ -698,7 +698,7 @@ export default function DoctorDashboard() {
       const { data } = await supabase
         .schema('medical')
         .from('appointments')
-        .select(`id, scheduled_at, duration_min, type, status, reason, patient:patients(id, first_name, last_name)`)
+        .select(`id, scheduled_at, duration_min, type, status, reason, patient:med_patients(id, first_name, last_name)`)
         .gte('scheduled_at', start.toISOString())
         .lte('scheduled_at', end.toISOString())
         .order('scheduled_at', { ascending: true })
@@ -717,7 +717,7 @@ export default function DoctorDashboard() {
   /* ── Mettre à jour statut RDV ── */
   async function updateStatus(apptId, status) {
     try {
-      await supabaseMedical.from('appointments')
+      await supabase.from('med_appointments')
         .update({ status }).eq('id', apptId)
       setQueue(q => q.map(a => a.id === apptId ? { ...a, status } : a))
       showToast(status === 'done' ? 'Consultation terminée' : 'Statut mis à jour')
@@ -735,7 +735,7 @@ export default function DoctorDashboard() {
     }
     setSaving(true)
     try {
-      await supabaseMedical.from('patients').insert({
+      await supabase.from('med_patients').insert({
         ...ptForm,
         tenant_id:   user.tenant_id,
         created_by:  user.id,
@@ -762,7 +762,7 @@ export default function DoctorDashboard() {
     setSaving(true)
     try {
       const { data: { user: u } } = await supabase.auth.getUser()
-      await supabaseMedical.from('appointments').insert({
+      await supabase.from('med_appointments').insert({
         ...apptForm,
         tenant_id:  user.tenant_id,
         status:     'pending',
