@@ -1062,7 +1062,7 @@ export default function DoctorDashboard() {
                       const critAllergies = (pt.allergies||[]).filter(a=>a.severity==='CRITIQUE')
                       const modAllergies  = (pt.allergies||[]).filter(a=>a.severity==='MODERE')
                       return (
-                        <div key={pt.id} className="md-patient-card">
+                        <div key={pt.id} className="md-patient-card" onClick={() => router.push(`/apps/medical/patient-detail?id=${pt.id}`)} style={{ cursor:"pointer" }}>
                           <div className="md-patient-header">
                             <div className="md-patient-avatar">
                               {initials(pt.first_name, pt.last_name)}
