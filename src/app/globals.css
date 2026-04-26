@@ -567,6 +567,13 @@ h6 { font-size: var(--text-base); }
   min-height: 100dvh;
 }
 
+/* ── Apps standalone — zéro espace navbar ── */
+[data-app-page] .page-wrapper,
+.page-wrapper:has(> [data-app-root]) {
+  padding-top: 0 !important;
+  min-height: 100dvh;
+}
+
 /* ── 8. BUTTONS ────────────────────────────────────────────── */
 .btn {
   display: inline-flex;

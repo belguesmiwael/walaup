@@ -56,7 +56,12 @@ function Inner(){
         const {data:ud}=await supabase.from('users').select('role,tenant_id,app_type,full_name,phone').eq('id',u.id).maybeSingle()
         if(!ud||ud.app_type!=='medical'){router.push('/apps/medical/login');return}
         setUser({...u,...ud})
-        const {data:all}=await supabase.from('users').select('id,full_name,role').eq('tenant_id',ud.tenant_id).eq('app_type','medical').neq('id',u.id)
+        // Charger contacts du même tenant — sans filtre app_type strict
+        const {data:all}=await supabase.from('users')
+          .select('id,full_name,role,app_type')
+          .eq('tenant_id',ud.tenant_id)
+          .neq('id',u.id)
+          .limit(50)
         setContacts(all||[])
         if(cp&&all){const pre=all.find(c=>c.id===cp);if(pre){setSelected(pre);setShowSide(false)}}
         const {data:ur}=await supabase.from('med_messages').select('from_uid').eq('to_uid',u.id).eq('read',false)
