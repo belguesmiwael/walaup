@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { initScrollAnimations, initTiltCards, initMagneticButtons, initCursorGlow, initScrollProgress } from '@/lib/animate'
 import { initPWA } from '@/lib/pwa'
 
@@ -10,6 +11,9 @@ import { initPWA } from '@/lib/pwa'
  * Mounted once in the root layout.
  */
 export default function EffectsClient() {
+  const pathname = usePathname()
+  if (pathname?.startsWith('/apps/')) return null
+
   useEffect(() => {
     // Small rAF delay to ensure DOM is fully painted
     const id = requestAnimationFrame(() => {

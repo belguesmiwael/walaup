@@ -579,6 +579,7 @@ export default function DoctorDashboard() {
   // Modal
   const [showNewPatient,  setShowNewPatient]  = useState(false)
   const [showNewAppt,     setShowNewAppt]     = useState(false)
+  const [patientsForModal, setPatientsForModal] = useState([])
   const [saving,          setSaving]          = useState(false)
 
   // Forms
@@ -711,6 +712,20 @@ export default function DoctorDashboard() {
     if (tab === 'patients')  { loadPatients(searchQuery) }
     if (tab === 'agenda')    { loadAgenda() }
   }, [tab, user, loadStats, loadQueue, loadPatients, loadAgenda, searchQuery])
+
+  /* ── Ouvrir modal RDV + charger patients ── */
+  async function openNewAppt() {
+    setShowNewAppt(true)
+    if (patientsForModal.length === 0) {
+      try {
+        const { data } = await supabase.from('med_patients')
+          .select('id, first_name, last_name')
+          .order('last_name', { ascending: true })
+          .limit(100)
+        setPatientsForModal(data || [])
+      } catch { /* silencieux */ }
+    }
+  }
 
   /* ── Mettre à jour statut RDV ── */
   async function updateStatus(apptId, status) {
@@ -915,7 +930,7 @@ export default function DoctorDashboard() {
                     <div className="md-quick-icon blue"><UserPlus size={20} /></div>
                     Nouveau patient
                   </button>
-                  <button className="md-quick-btn" onClick={() => setShowNewAppt(true)}>
+                  <button className="md-quick-btn" onClick={() => { openNewAppt() }}>
                     <div className="md-quick-icon green"><CalendarDays size={20} /></div>
                     Prendre RDV
                   </button>
@@ -1116,7 +1131,7 @@ export default function DoctorDashboard() {
                       (() => { const d = new Date(); d.setDate(d.getDate()-d.getDay()+1); return formatDate(d.toISOString()) })()
                     }</div>
                   </div>
-                  <button className="md-btn primary" onClick={() => setShowNewAppt(true)}
+                  <button className="md-btn primary" onClick={() => { openNewAppt() }}
                     style={{ display:'flex', alignItems:'center', gap:6 }}>
                     <Plus size={15} /> Nouveau RDV
                   </button>
@@ -1352,7 +1367,7 @@ export default function DoctorDashboard() {
                   value={apptForm.patient_id}
                   onChange={e => setApptForm(f=>({...f, patient_id:e.target.value}))}>
                   <option value="">— Sélectionner un patient —</option>
-                  {patients.map(p => (
+                  {(patientsForModal.length > 0 ? patientsForModal : patients).map(p => (
                     <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>
                   ))}
                 </select>

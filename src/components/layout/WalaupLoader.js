@@ -1,8 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 
 export default function WalaupLoader() {
+  const pathname = usePathname()
+  if (pathname?.startsWith('/apps/')) return null
+
   // 'drawing' → 'revealing' → 'fading' → 'done'
   const [phase, setPhase] = useState('drawing')
 

@@ -217,6 +217,7 @@ export default function SecretaryDashboard() {
   const [loadingP, setLoadingP] = useState(false)
 
   const [showNewAppt,    setShowNewAppt]    = useState(false)
+  const [patientsForModal, setPatientsForModal] = useState([])
   const [showNewPatient, setShowNewPatient] = useState(false)
   const [saving, setSaving] = useState(false)
   const [apptForm, setApptForm] = useState({ patient_id:'', scheduled_at:'', duration_min:30, type:'presentiel', reason:'' })
@@ -374,7 +375,14 @@ export default function SecretaryDashboard() {
                   </div>
                   <div style={{ display:'flex', gap:8 }}>
                     <button className="sec-icon-btn" onClick={loadQueue}><RefreshCw size={14}/></button>
-                    <button className="sec-btn primary" onClick={() => { loadPatients(); setShowNewAppt(true) }}
+                    <button className="sec-btn primary" onClick={async () => {
+                    setShowNewAppt(true)
+                    if (patientsForModal.length === 0) {
+                      const { data } = await supabase.from('med_patients')
+                        .select('id, first_name, last_name').order('last_name', { ascending: true }).limit(100)
+                      setPatientsForModal(data || [])
+                    }
+                  }}
                       style={{ display:'flex', alignItems:'center', gap:6 }}>
                       <Plus size={14}/> Nouveau RDV
                     </button>
@@ -510,7 +518,7 @@ export default function SecretaryDashboard() {
                 <select className="sec-select" required value={apptForm.patient_id}
                   onChange={e=>setApptForm(f=>({...f,patient_id:e.target.value}))}>
                   <option value="">— Sélectionner —</option>
-                  {patients.map(p=><option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
+                  {(patientsForModal.length > 0 ? patientsForModal : patients).map(p=><option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
                 </select>
               </div>
               <div className="sec-form-group">
