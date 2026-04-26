@@ -318,22 +318,10 @@ export default function LoginPage() {
         .select('role')
         .eq('id', user.id)
         .maybeSingle()
-      const role     = data?.role     || 'client'
-      const appType  = data?.app_type || null
+      const role = data?.role || 'client'
       WalaupSound.success()
-
-      // Redirection selon rôle + app_type
-      if (role === 'super_admin') {
-        router.push('/admin')
-      } else if (role === 'tenant_admin' && appType === 'medical') {
-        router.push('/apps/medical/doctor')
-      } else if (role === 'tenant_user' && appType === 'medical') {
-        router.push('/apps/medical/secretary')
-      } else if (role === 'app_end_user' && appType === 'medical') {
-        router.push('/apps/medical/patient')
-      } else {
-        router.push('/client')
-      }
+      // Espace client Walaup uniquement — chaque app a son propre /apps/[type]/login
+      router.push(role === 'super_admin' ? '/admin' : '/client')
     } catch {
       // If users table has no row yet, default to client
       WalaupSound.success()
