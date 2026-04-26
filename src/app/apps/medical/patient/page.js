@@ -140,7 +140,7 @@ export default function PatientPortal() {
         setUser({ ...u, ...userData })
 
         // Charger le dossier patient lié au compte
-        const { data: pt } = await supabase.schema('medical').from('patients')
+        const { data: pt } = await supabase.from('med_patients')
           .select('*').eq('user_id', u.id).maybeSingle()
         setPatient(pt)
       } catch { router.push('/apps/medical/login') }
@@ -153,7 +153,7 @@ export default function PatientPortal() {
     if (!patient) return
     setLoadingAppts(true)
     try {
-      const { data } = await supabase.schema('medical').from('appointments')
+      const { data } = await supabase.from('med_appointments')
         .select('id, scheduled_at, duration_min, type, status, reason')
         .eq('patient_id', patient.id)
         .order('scheduled_at', { ascending: false })
