@@ -7,6 +7,8 @@ import {
   CheckCircle2, XCircle, Phone, RefreshCw, UserPlus
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import MedicalCalendar from '@/components/features/apps/medical/MedicalCalendar'
+import ProfileModal from '@/components/features/apps/medical/ProfileModal'
 
 const CSS = `
   .sec-root { position:fixed; inset:0; display:flex; flex-direction:column; background:var(--bg-base); overflow:hidden; }
@@ -184,9 +186,10 @@ const CSS = `
 `
 
 const NAV = [
-  { id: 'agenda',   icon: CalendarDays, label: 'Agenda'   },
-  { id: 'patients', icon: Users,        label: 'Patients' },
-  { id: 'messages', icon: MessageSquare,label: 'Messages' },
+  { id: 'agenda',    icon: CalendarDays,  label: 'Agenda'    },
+  { id: 'creneaux',  icon: CalendarDays,  label: 'Créneaux'  },
+  { id: 'patients',  icon: Users,         label: 'Patients'  },
+  { id: 'messages',  icon: MessageSquare, label: 'Messages'  },
 ]
 
 function formatTime(iso) {
@@ -207,6 +210,7 @@ export default function SecretaryDashboard() {
   const [loading,  setLoading]  = useState(true)
   const [tab,      setTab]      = useState('agenda')
   const [sideOpen, setSideOpen] = useState(true)
+  const [showProfile, setShowProfile] = useState(false)
   const [toast,    setToast]    = useState(null)
   const toastRef = useRef(null)
 
@@ -333,7 +337,9 @@ export default function SecretaryDashboard() {
           <span className="sec-logo">MediLink OS</span>
           <span className="sec-badge">Secrétaire</span>
           <span className="sec-sep" />
-          <div className="sec-avatar">{(user?.email||'S')[0].toUpperCase()}</div>
+          <div className="sec-avatar" onClick={() => setShowProfile(true)} style={{ cursor:'pointer' }} title="Mon profil">
+            {(user?.full_name||user?.email||'S')[0].toUpperCase()}
+          </div>
         </div>
 
         <div className="sec-body">
@@ -341,7 +347,7 @@ export default function SecretaryDashboard() {
           <div className={`sec-sidebar ${sideOpen?'sec-sidebar--open':'sec-sidebar--closed'}`}>
             <div className="sec-sb-header">
               <span className="sec-sb-text">Secrétariat</span>
-              <button className="sec-toggle" onClick={() => setSideOpen(o=>!o)}>
+              <button className="sec-toggle" onClick={() => setSideOpen(o => !o)} title={sideOpen ? 'Réduire' : 'Ouvrir'}>
                 {sideOpen ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
               </button>
             </div>
@@ -462,7 +468,7 @@ export default function SecretaryDashboard() {
                 ) : (
                   <div className="sec-pt-grid">
                     {patients.map(pt => (
-                      <div key={pt.id} className="sec-pt-card">
+                      <div key={pt.id} className="sec-pt-card" onClick={() => router.push('/apps/medical/patient-detail?id=' + pt.id)} style={{ cursor:'pointer' }}>
                         <div className="sec-pt-header">
                           <div className="sec-pt-avatar">{initials(pt.first_name, pt.last_name)}</div>
                           <div>
@@ -597,6 +603,23 @@ export default function SecretaryDashboard() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Créneaux */}
+      {tab === 'creneaux' && user && (
+        <>
+          <div className="sec-header">
+            <div>
+              <div className="sec-title">Créneaux & Agenda</div>
+              <div className="sec-sub">Gérez les rendez-vous</div>
+            </div>
+          </div>
+          <MedicalCalendar tenantId={user.tenant_id} userId={user.id} userRole={user.role} readOnly={false}/>
+        </>
+      )}
+
+      {showProfile && user && (
+        <ProfileModal user={{ ...user, full_name: user.full_name || user.email }} onClose={() => setShowProfile(false)}/>
       )}
 
       {toast && <div className={`sec-toast ${toast.type}`}>{toast.msg}</div>}

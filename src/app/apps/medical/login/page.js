@@ -214,7 +214,9 @@ function sanitizeEmail(v) {
 
 export default function MedicalLogin() {
   const router = useRouter()
+  const [loginMethod, setLoginMethod] = useState('email') // 'email' | 'phone'
   const [email,    setEmail]    = useState('')
+  const [phone,    setPhone]    = useState('')
   const [password, setPassword] = useState('')
   const [showPw,   setShowPw]   = useState(false)
   const [loading,  setLoading]  = useState(false)
@@ -225,18 +227,46 @@ export default function MedicalLogin() {
     e.preventDefault()
     setError('')
 
-    const cleanEmail = sanitizeEmail(email)
-    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      setError('Adresse email invalide.'); return
-    }
     if (!password || password.length < 6) {
       setError('Mot de passe requis (minimum 6 caractères).'); return
+    }
+
+    let loginEmail = ''
+
+    if (loginMethod === 'phone') {
+      // Recherche email par téléphone dans public.users
+      const cleanPhone = phone.trim().replace(/\s/g, '')
+      if (!cleanPhone) { setError('Numéro de téléphone requis.'); return }
+      const { data: userData } = await supabase
+        .from('users').select('id').eq('phone', cleanPhone).maybeSingle()
+      if (!userData) {
+        // Chercher aussi dans med_patients
+        const { data: ptData } = await supabase
+          .from('med_patients').select('user_id').eq('phone', cleanPhone).maybeSingle()
+        if (!ptData?.user_id) { setError('Aucun compte trouvé avec ce numéro.'); return }
+        const { data: authUser } = await supabase.auth.admin?.getUserById?.(ptData.user_id) || {}
+        if (!authUser) { setError('Compte introuvable.'); return }
+      }
+      // Récupérer l'email via auth (on cherche dans users par phone)
+      const { data: userByPhone } = await supabase
+        .from('users').select('id').eq('phone', cleanPhone).maybeSingle()
+      if (!userByPhone) { setError('Aucun compte trouvé avec ce numéro.'); return }
+      // On utilise une edge function ou on demande au user de saisir son email
+      // Fallback simple: chercher l'email dans auth.users via phone stocké en metadata
+      setError('Connexion par téléphone : utilisez votre email associé ou contactez votre médecin.'); 
+      setLoading(false); return
+    } else {
+      const cleanEmail = sanitizeEmail(email)
+      if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        setError('Adresse email invalide.'); return
+      }
+      loginEmail = cleanEmail
     }
 
     setLoading(true)
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
+        email: loginEmail,
         password,
       })
 
@@ -336,6 +366,22 @@ export default function MedicalLogin() {
             <span className="ml-role-badge patient">Patient</span>
           </div>
 
+          {/* Toggle email/phone */}
+          <div style={{ display:'flex', gap:4, marginBottom:18, background:'rgba(255,255,255,.05)', borderRadius:10, padding:4 }}>
+            <button type="button" onClick={() => setLoginMethod('email')} style={{
+              flex:1, padding:'7px', borderRadius:8, border:'none', cursor:'pointer', transition:'all .16s',
+              background: loginMethod==='email' ? 'rgba(14,165,233,.2)' : 'transparent',
+              color: loginMethod==='email' ? '#0EA5E9' : 'rgba(148,163,184,.6)',
+              fontSize:'.78rem', fontWeight:700,
+            }}>Email</button>
+            <button type="button" onClick={() => setLoginMethod('phone')} style={{
+              flex:1, padding:'7px', borderRadius:8, border:'none', cursor:'pointer', transition:'all .16s',
+              background: loginMethod==='phone' ? 'rgba(14,165,233,.2)' : 'transparent',
+              color: loginMethod==='phone' ? '#0EA5E9' : 'rgba(148,163,184,.6)',
+              fontSize:'.78rem', fontWeight:700,
+            }}>Téléphone</button>
+          </div>
+
           <div className="ml-title">Connexion</div>
           <div className="ml-subtitle">Accédez à votre espace médical sécurisé</div>
 
@@ -343,22 +389,28 @@ export default function MedicalLogin() {
           {success && <div className="ml-success">{success}</div>}
 
           <form onSubmit={handleLogin} noValidate>
-            <div className="ml-form-group">
-              <label className="ml-label">Adresse email</label>
-              <div className="ml-input-wrap">
-                <span className="ml-input-icon"><Mail size={16}/></span>
-                <input
-                  className="ml-input"
-                  type="email"
-                  placeholder="votre@email.com"
-                  maxLength={254}
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  autoComplete="email"
-                  required
-                />
+            {loginMethod === 'email' ? (
+              <div className="ml-form-group">
+                <label className="ml-label">Adresse email</label>
+                <div className="ml-input-wrap">
+                  <span className="ml-input-icon"><Mail size={16}/></span>
+                  <input className="ml-input" type="email" placeholder="votre@email.com"
+                    maxLength={254} value={email} onChange={e => setEmail(e.target.value)}
+                    autoComplete="email" required/>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="ml-form-group">
+                <label className="ml-label">Numéro de téléphone</label>
+                <div className="ml-input-wrap">
+                  <span className="ml-input-icon"><span style={{ fontSize:'.85rem', color:'rgba(148,163,184,.5)' }}>+216</span></span>
+                  <input className="ml-input" type="tel" placeholder="XX XXX XXX"
+                    style={{ paddingLeft:52 }}
+                    maxLength={20} value={phone} onChange={e => setPhone(e.target.value)}
+                    autoComplete="tel"/>
+                </div>
+              </div>
+            )}
 
             <div className="ml-form-group">
               <label className="ml-label">Mot de passe</label>

@@ -7,6 +7,8 @@ import {
   Phone, MapPin, ChevronRight, RefreshCw
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import MedicalCalendar from '@/components/features/apps/medical/MedicalCalendar'
+import ProfileModal from '@/components/features/apps/medical/ProfileModal'
 
 const CSS = `
   .pt-root { position:fixed; inset:0; display:flex; flex-direction:column; background:var(--bg-base); overflow:hidden; }
@@ -102,9 +104,10 @@ const CSS = `
 `
 
 const TABS = [
-  { id: 'dossier',  icon: User,         label: 'Mon dossier' },
-  { id: 'rdv',      icon: CalendarDays, label: 'Mes RDV'     },
-  { id: 'messages', icon: MessageSquare,label: 'Messages'    },
+  { id: 'dossier',   icon: User,          label: 'Mon dossier' },
+  { id: 'rdv',       icon: CalendarDays,  label: 'Mes RDV'     },
+  { id: 'creneaux',  icon: CalendarDays,  label: 'Réserver'    },
+  { id: 'messages',  icon: MessageSquare, label: 'Messages'    },
 ]
 
 function formatDateTime(iso) {
@@ -122,6 +125,7 @@ export default function PatientPortal() {
   const [patient,   setPatient]   = useState(null)
   const [loading,   setLoading]   = useState(true)
   const [tab,       setTab]       = useState('dossier')
+  const [showProfile, setShowProfile] = useState(false)
   const [appts,     setAppts]     = useState([])
   const [loadingAppts, setLoadingAppts] = useState(false)
   const toastRef = useRef(null)
@@ -188,6 +192,9 @@ export default function PatientPortal() {
           <span className="pt-logo">MediLink OS</span>
           <span className="pt-badge">Portail Patient</span>
           <span className="pt-sep" />
+          <div onClick={() => setShowProfile(true)} style={{ cursor:'pointer', width:32, height:32, borderRadius:'50%', background:'linear-gradient(135deg,var(--green),#34D399)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'.75rem', fontWeight:800, color:'white', flexShrink:0 }}>
+            {(patient?.first_name||'P')[0]}
+          </div>
           <button className="pt-logout-btn" onClick={handleLogout}>
             <LogOut size={14} /> Déconnexion
           </button>
@@ -396,6 +403,18 @@ export default function PatientPortal() {
             </>
           )}
 
+          {/* CRÉNEAUX */}
+          {tab === 'creneaux' && user && (
+            <div style={{ marginBottom:16 }}>
+              <MedicalCalendar
+                tenantId={user.tenant_id}
+                userId={user.id}
+                userRole={user.role}
+                readOnly={true}
+              />
+            </div>
+          )}
+
           {/* MESSAGES */}
           {tab === 'messages' && (
             <div className="pt-card">
@@ -421,6 +440,12 @@ export default function PatientPortal() {
           </nav>
         </div>
       </div>
+      {showProfile && user && patient && (
+        <ProfileModal
+          user={{ ...user, full_name: `${patient.first_name} ${patient.last_name}`, phone: patient.phone }}
+          onClose={() => setShowProfile(false)}
+        />
+      )}
     </>
   )
 }

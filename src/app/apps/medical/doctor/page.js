@@ -9,6 +9,8 @@ import {
   Phone, ChevronRight as Arrow, Moon, Sun, Menu, X, BarChart2
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import MedicalCalendar from '@/components/features/apps/medical/MedicalCalendar'
+import ProfileModal from '@/components/features/apps/medical/ProfileModal'
 
 /* ─── CSS ────────────────────────────────────────────────────────────────── */
 const CSS = `
@@ -527,6 +529,7 @@ const NAV = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
   { id: 'patients',  icon: Users,           label: 'Patients'         },
   { id: 'agenda',    icon: CalendarDays,    label: 'Agenda'           },
+  { id: 'creneaux',  icon: CalendarDays,    label: 'Créneaux'         },
   { id: 'messages',  icon: MessageSquare,   label: 'Messages', isLink: '/apps/medical/messagerie' },
   { id: 'analytics', icon: TrendingUp,      label: 'Analytics', isLink: '/apps/medical/analytics' },
   { id: 'parametres',icon: Settings,        label: 'Paramètres'       },
@@ -578,6 +581,9 @@ export default function DoctorDashboard() {
 
   // Modal
   const [showNewPatient,  setShowNewPatient]  = useState(false)
+  const [showProfile,     setShowProfile]     = useState(false)
+  const [showCreateAccount, setShowCreateAccount] = useState(false)
+  const [accountForm,     setAccountForm]     = useState({ email:'', phone:'', password:'', first_name:'', last_name:'' })
   const [showNewAppt,     setShowNewAppt]     = useState(false)
   const [patientsForModal, setPatientsForModal] = useState([])
   const [saving,          setSaving]          = useState(false)
@@ -835,7 +841,7 @@ export default function DoctorDashboard() {
           <button className="md-icon-btn" title="Notifications">
             <Bell size={16} />
           </button>
-          <div className="md-topbar-avatar" title={doctorName}>
+          <div className="md-topbar-avatar" title={doctorName} onClick={() => setShowProfile(true)} style={{ cursor:'pointer' }}>
             {doctorName.charAt(0).toUpperCase()}
           </div>
         </div>
@@ -1419,6 +1425,32 @@ export default function DoctorDashboard() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* ══ TAB : CRÉNEAUX ══ */}
+      {tab === 'creneaux' && user && (
+        <>
+          <div className="md-section-header">
+            <div>
+              <div className="md-section-title">Créneaux & Agenda</div>
+              <div className="md-section-sub">Cliquez sur un créneau libre pour réserver</div>
+            </div>
+          </div>
+          <MedicalCalendar
+            tenantId={user.tenant_id}
+            userId={user.id}
+            userRole={user.role}
+            readOnly={false}
+          />
+        </>
+      )}
+
+      {/* ── ProfileModal ── */}
+      {showProfile && user && (
+        <ProfileModal
+          user={{ ...user, full_name: doctorName }}
+          onClose={() => setShowProfile(false)}
+        />
       )}
 
       {/* ── Toast ── */}
