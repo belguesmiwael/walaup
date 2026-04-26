@@ -90,11 +90,17 @@ function Inner(){
     if(subRef.current)subRef.current.unsubscribe()
     if(!user||!selected)return
     subRef.current=supabase.channel(`m_${user.id}_${selected.id}`)
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'med_messages'},p=>{
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'med_messages',
+        filter:`to_uid=eq.${user.id}`
+      },p=>{
         const m=p.new
-        if((m.from_uid===user.id&&m.to_uid===selected.id)||(m.from_uid===selected.id&&m.to_uid===user.id)){
-          setMessages(prev=>[...prev,m])
-          if(m.to_uid===user.id)supabase.from('med_messages').update({read:true}).eq('id',m.id)
+        // Ne traiter que les messages de l'autre personne (les miens = déjà optimistic)
+        if(m.from_uid===selected.id&&m.to_uid===user.id){
+          setMessages(prev=>{
+            const exists=prev.some(x=>x.id===m.id)
+            return exists?prev:[...prev,m]
+          })
+          supabase.from('med_messages').update({read:true}).eq('id',m.id)
         }
       }).subscribe()
     return()=>{if(subRef.current)subRef.current.unsubscribe()}
@@ -106,14 +112,37 @@ function Inner(){
     if(!selected||!user||sending)return
     const b=b2||body.trim()
     if(!b&&!fd)return
-    setSending(true);setBody('');setFilePrev(null)
+    setSending(true)
+    setBody('')
+    setFilePrev(null)
+    // Optimistic update — affichage immédiat avant confirmation Supabase
+    const optimistic={
+      id:'opt_'+Date.now(),
+      from_uid:user.id,
+      to_uid:selected.id,
+      body:b||'',
+      read:false,
+      sent_at:new Date().toISOString(),
+      msg_type:fd?.type||'text',
+      file_url:fd?.url||null,
+      file_name:fd?.name||null,
+      file_type:fd?.mime||null,
+    }
+    setMessages(prev=>[...prev,optimistic])
     try{
-      await supabase.from('med_messages').insert({
+      const {data:inserted}=await supabase.from('med_messages').insert({
         tenant_id:user.tenant_id,from_uid:user.id,to_uid:selected.id,
         body:b||'',read:false,msg_type:fd?.type||'text',
         file_url:fd?.url||null,file_name:fd?.name||null,file_type:fd?.mime||null
-      })
-    }catch{}
+      }).select('id,from_uid,to_uid,body,read,sent_at,file_url,file_name,file_type,msg_type').single()
+      // Remplacer le message optimiste par le vrai
+      if(inserted){
+        setMessages(prev=>prev.map(m=>m.id===optimistic.id?inserted:m))
+      }
+    }catch{
+      // Retirer le message optimiste si erreur
+      setMessages(prev=>prev.filter(m=>m.id!==optimistic.id))
+    }
     setSending(false)
   }
 
@@ -171,7 +200,11 @@ function Inner(){
     await sendMsg('📹 Appel vidéo — Cliquez pour rejoindre',{url,name:'Appel vidéo',mime:'video/call',type:'video_call'})
   }
 
-  const filtered=contacts.filter(c=>!search||(c.full_name||'').toLowerCase().includes(search.toLowerCase()))
+  // Séparer contacts par rôle
+  const searchFn = c => !search||(c.full_name||'').toLowerCase().includes(search.toLowerCase())
+  const staffContacts   = contacts.filter(c=>['tenant_admin','tenant_user'].includes(c.role)&&searchFn(c))
+  const patientContacts = contacts.filter(c=>c.role==='app_end_user'&&searchFn(c))
+  const filtered = [...staffContacts,...patientContacts]
   const backRoute=BACK_ROUTES[user?.role]||'/apps/medical/login'
   const myColor=ROLE_COLORS[user?.role]||ROLE_COLORS.app_end_user
 
@@ -261,17 +294,44 @@ function Inner(){
                 <div style={{padding:'30px 14px',textAlign:'center',color:'var(--tx-3)',fontSize:'.78rem'}}>
                   <User size={24} style={{margin:'0 auto 8px',display:'block',opacity:.3}}/>Aucun contact
                 </div>
-              ):filtered.map(c=>(
-                <div key={c.id} className={`mci ${selected?.id===c.id?'active':''}`} onClick={()=>{setSelected(c);setShowSide(false)}}>
-                  <div className="mca" style={{background:ROLE_COLORS[c.role]||ROLE_COLORS.app_end_user}}>{initials(c.full_name)}</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div className="mcn">{c.full_name||'Utilisateur'}</div>
-                    <div className="mcr">{ROLE_LABELS[c.role]||c.role}</div>
-                  </div>
-                  {unread[c.id]>0&&<div className="mub">{unread[c.id]}</div>}
-                  <ChevronRight size={12} color="var(--tx-3)"/>
-                </div>
-              ))}
+              ):(
+                <>
+                  {/* Section Équipe (médecin/secrétaire) */}
+                  {staffContacts.length>0&&(
+                    <>
+                      <div style={{padding:'7px 13px 3px',fontSize:'.63rem',fontWeight:800,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--tx-3)',borderBottom:'1px solid var(--border)'}}>Équipe</div>
+                      {staffContacts.map(c=>(
+                        <div key={c.id} className={`mci ${selected?.id===c.id?'active':''}`} onClick={()=>{setSelected(c);setShowSide(false)}}>
+                          <div className="mca" style={{background:ROLE_COLORS[c.role]||ROLE_COLORS.app_end_user}}>{initials(c.full_name)}</div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div className="mcn">{c.full_name||'Utilisateur'}</div>
+                            <div className="mcr">{ROLE_LABELS[c.role]||c.role}</div>
+                          </div>
+                          {unread[c.id]>0&&<div className="mub">{unread[c.id]}</div>}
+                          <ChevronRight size={12} color="var(--tx-3)"/>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                  {/* Section Patients */}
+                  {patientContacts.length>0&&(
+                    <>
+                      <div style={{padding:'7px 13px 3px',fontSize:'.63rem',fontWeight:800,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--tx-3)',borderBottom:'1px solid var(--border)'}}>Patients</div>
+                      {patientContacts.map(c=>(
+                        <div key={c.id} className={`mci ${selected?.id===c.id?'active':''}`} onClick={()=>{setSelected(c);setShowSide(false)}}>
+                          <div className="mca" style={{background:ROLE_COLORS[c.role]||ROLE_COLORS.app_end_user}}>{initials(c.full_name)}</div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div className="mcn">{c.full_name||'Utilisateur'}</div>
+                            <div className="mcr">{ROLE_LABELS[c.role]||c.role}</div>
+                          </div>
+                          {unread[c.id]>0&&<div className="mub">{unread[c.id]}</div>}
+                          <ChevronRight size={12} color="var(--tx-3)"/>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </>
+              )}
             </div>
           </div>
           {/* Thread */}
