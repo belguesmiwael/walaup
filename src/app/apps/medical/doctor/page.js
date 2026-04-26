@@ -6,7 +6,7 @@ import {
   LogOut, ChevronLeft, ChevronRight, Bell, Plus, Search,
   Clock, CheckCircle2, XCircle, AlertCircle, Activity,
   UserPlus, Stethoscope, Video, Lock, TrendingUp, RefreshCw,
-  Phone, ChevronRight as Arrow, Moon, Sun, Menu, X
+  Phone, ChevronRight as Arrow, Moon, Sun, Menu, X, BarChart2
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -525,10 +525,11 @@ const CSS = `
 /* ─── Nav config ──────────────────────────────────────────────────────────── */
 const NAV = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
-  { id: 'patients',  icon: Users,           label: 'Patients',      badge: 0 },
-  { id: 'agenda',    icon: CalendarDays,    label: 'Agenda'         },
-  { id: 'messages',  icon: MessageSquare,   label: 'Messages',      badge: 0 },
-  { id: 'parametres',icon: Settings,        label: 'Paramètres'     },
+  { id: 'patients',  icon: Users,           label: 'Patients'         },
+  { id: 'agenda',    icon: CalendarDays,    label: 'Agenda'           },
+  { id: 'messages',  icon: MessageSquare,   label: 'Messages', isLink: '/apps/medical/messagerie' },
+  { id: 'analytics', icon: TrendingUp,      label: 'Analytics', isLink: '/apps/medical/analytics' },
+  { id: 'parametres',icon: Settings,        label: 'Paramètres'       },
 ]
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
@@ -839,7 +840,7 @@ export default function DoctorDashboard() {
                 <div
                   key={item.id}
                   className={`md-sb-item ${tab === item.id ? 'active' : ''}`}
-                  onClick={() => setTab(item.id)}
+                  onClick={() => item.isLink ? router.push(item.isLink) : setTab(item.id)}
                   title={item.label}
                 >
                   <item.icon size={17} />
@@ -1241,7 +1242,7 @@ export default function DoctorDashboard() {
           <nav className="md-bn-inner">
             {NAV.map(item => (
               <button key={item.id} className={`md-bn-item ${tab===item.id?'active':''}`}
-                onClick={() => setTab(item.id)}>
+                onClick={() => item.isLink ? router.push(item.isLink) : setTab(item.id)}>
                 <item.icon />
                 {item.label.split(' ')[0]}
               </button>
