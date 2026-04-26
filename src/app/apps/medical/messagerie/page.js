@@ -57,12 +57,28 @@ function Inner(){
         if(!ud||ud.app_type!=='medical'){router.push('/apps/medical/login');return}
         setUser({...u,...ud})
         // Charger contacts du même tenant — sans filtre app_type strict
-        const {data:all}=await supabase.from('users')
+        // Récupérer les contacts — si tenant_id absent, chercher via med_patients
+        let tenantId = ud.tenant_id
+        if (!tenantId && ud.role === 'app_end_user') {
+          const {data:ptData} = await supabase.from('med_patients')
+            .select('tenant_id').eq('user_id', u.id).maybeSingle()
+          tenantId = ptData?.tenant_id
+          // Mettre à jour public.users avec le bon tenant_id
+          if (tenantId) {
+            await supabase.from('users').update({ tenant_id: tenantId }).eq('id', u.id)
+            ud.tenant_id = tenantId
+          }
+        }
+        const {data:all} = await supabase.from('users')
           .select('id,full_name,role,app_type')
-          .eq('tenant_id',ud.tenant_id)
-          .neq('id',u.id)
+          .eq('tenant_id', tenantId || ud.tenant_id)
+          .neq('id', u.id)
           .limit(50)
         setContacts(all||[])
+        // Mettre à jour l'état user avec le bon tenant_id
+        if (tenantId && !ud.tenant_id) {
+          setUser(prev => prev ? {...prev, tenant_id: tenantId} : prev)
+        }
         if(cp&&all){const pre=all.find(c=>c.id===cp);if(pre){setSelected(pre);setShowSide(false)}}
         const {data:ur}=await supabase.from('med_messages').select('from_uid').eq('to_uid',u.id).eq('read',false)
         const counts={};(ur||[]).forEach(m=>{counts[m.from_uid]=(counts[m.from_uid]||0)+1});setUnread(counts)
