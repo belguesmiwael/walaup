@@ -6,7 +6,7 @@ import {
   Plus, Search, Clock, ChevronLeft, ChevronRight,
   CheckCircle2, XCircle, Phone, RefreshCw, UserPlus
 } from 'lucide-react'
-import { supabase, supabaseMedical } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 
 const CSS = `
   .sec-root { position:fixed; inset:0; display:flex; flex-direction:column; background:var(--bg-base); overflow:hidden; }
@@ -246,7 +246,7 @@ export default function SecretaryDashboard() {
     setLoadingQ(true)
     try {
       const today = new Date().toISOString().slice(0,10)
-      const { data } = await supabaseMedical.from('appointments')
+      const { data } = await supabase.schema('medical').from('appointments')
         .select('id, scheduled_at, duration_min, type, status, reason, patient:patients(id,first_name,last_name,phone)')
         .gte('scheduled_at', `${today}T00:00:00`).lte('scheduled_at', `${today}T23:59:59`)
         .order('scheduled_at', { ascending: true })
@@ -258,7 +258,7 @@ export default function SecretaryDashboard() {
   const loadPatients = useCallback(async (q='') => {
     setLoadingP(true)
     try {
-      let query = supabaseMedical.from('patients')
+      let query = supabase.schema('medical').from('patients')
         .select('id,first_name,last_name,birth_date,phone,email,city,last_visit')
         .order('last_name', { ascending: true }).limit(30)
       if (q.trim()) query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`)
@@ -276,7 +276,7 @@ export default function SecretaryDashboard() {
 
   async function updateStatus(id, status) {
     try {
-      await supabaseMedical.from('appointments').update({ status }).eq('id', id)
+      await supabase.schema('medical').from('appointments').update({ status }).eq('id', id)
       setQueue(q => q.map(a => a.id === id ? { ...a, status } : a))
       showToast('Statut mis à jour')
     } catch { showToast('Erreur', 'error') }
@@ -288,7 +288,7 @@ export default function SecretaryDashboard() {
     setSaving(true)
     try {
       const { data: { user: u } } = await supabase.auth.getUser()
-      await supabaseMedical.from('appointments').insert({ ...apptForm, status:'pending', created_by:u.id })
+      await supabase.schema('medical').from('appointments').insert({ ...apptForm, status:'pending', created_by:u.id })
       showToast('Rendez-vous créé')
       setShowNewAppt(false)
       setApptForm({ patient_id:'', scheduled_at:'', duration_min:30, type:'presentiel', reason:'' })
@@ -302,7 +302,7 @@ export default function SecretaryDashboard() {
     if (!ptForm.first_name.trim() || !ptForm.last_name.trim()) { showToast('Prénom et nom requis', 'error'); return }
     setSaving(true)
     try {
-      await supabaseMedical.from('patients').insert({
+      await supabase.schema('medical').from('patients').insert({
         ...ptForm, allergies:[], chronic_cond:[], current_meds:[],
         created_by: user.id,
       })
