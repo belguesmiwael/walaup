@@ -596,7 +596,7 @@ export default function DoctorDashboard() {
     async function init() {
       try {
         const { data: { user: u } } = await supabase.auth.getUser()
-        if (!u) { router.push('/login'); return }
+        if (!u) { router.push('/apps/medical/login'); return }
 
         const { data: userData } = await supabase
           .from('users')
@@ -605,7 +605,7 @@ export default function DoctorDashboard() {
           .maybeSingle()
 
         if (!userData || userData.role !== 'tenant_admin' || userData.app_type !== 'medical') {
-          router.push('/login'); return
+          router.push('/apps/medical/login'); return
         }
 
         setUser({ ...u, ...userData })
@@ -620,7 +620,7 @@ export default function DoctorDashboard() {
 
         setDoctor(tenantData)
       } catch {
-        router.push('/login')
+        router.push('/apps/medical/login')
       } finally {
         setLoading(false)
       }
@@ -773,7 +773,7 @@ export default function DoctorDashboard() {
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    router.push('/login')
+    router.push('/apps/medical/login')
   }
 
   function toggleDark() {

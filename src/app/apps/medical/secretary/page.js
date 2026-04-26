@@ -232,11 +232,11 @@ export default function SecretaryDashboard() {
     async function init() {
       try {
         const { data: { user: u } } = await supabase.auth.getUser()
-        if (!u) { router.push('/login'); return }
+        if (!u) { router.push('/apps/medical/login'); return }
         const { data } = await supabase.from('users').select('role,tenant_id,app_type').eq('id', u.id).maybeSingle()
-        if (!data || data.role !== 'tenant_user' || data.app_type !== 'medical') { router.push('/login'); return }
+        if (!data || data.role !== 'tenant_user' || data.app_type !== 'medical') { router.push('/apps/medical/login'); return }
         setUser({ ...u, ...data })
-      } catch { router.push('/login') }
+      } catch { router.push('/apps/medical/login') }
       finally { setLoading(false) }
     }
     init()
@@ -315,7 +315,7 @@ export default function SecretaryDashboard() {
   }
 
   async function handleLogout() {
-    await supabase.auth.signOut(); router.push('/login')
+    await supabase.auth.signOut(); router.push('/apps/medical/login')
   }
 
   if (loading) return (

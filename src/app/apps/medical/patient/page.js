@@ -130,12 +130,12 @@ export default function PatientPortal() {
     async function init() {
       try {
         const { data: { user: u } } = await supabase.auth.getUser()
-        if (!u) { router.push('/login'); return }
+        if (!u) { router.push('/apps/medical/login'); return }
 
         const { data: userData } = await supabase
           .from('users').select('role,tenant_id,app_type').eq('id', u.id).maybeSingle()
         if (!userData || userData.role !== 'app_end_user' || userData.app_type !== 'medical') {
-          router.push('/login'); return
+          router.push('/apps/medical/login'); return
         }
         setUser({ ...u, ...userData })
 
@@ -143,7 +143,7 @@ export default function PatientPortal() {
         const { data: pt } = await supabase.schema('medical').from('patients')
           .select('*').eq('user_id', u.id).maybeSingle()
         setPatient(pt)
-      } catch { router.push('/login') }
+      } catch { router.push('/apps/medical/login') }
       finally { setLoading(false) }
     }
     init()
@@ -168,7 +168,7 @@ export default function PatientPortal() {
   }, [tab, patient, loadAppts])
 
   async function handleLogout() {
-    await supabase.auth.signOut(); router.push('/login')
+    await supabase.auth.signOut(); router.push('/apps/medical/login')
   }
 
   if (loading) return (
