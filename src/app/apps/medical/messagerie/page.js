@@ -75,10 +75,11 @@ function Inner(){
   const loadMsgs=useCallback(async()=>{
     if(!user||!selected)return
     try{
-      const {data}=await supabase.from('med_messages')
+      const {data,error:loadErr}=await supabase.from('med_messages')
         .select('id,from_uid,to_uid,body,read,sent_at,file_url,file_name,file_type,msg_type')
         .or(`and(from_uid.eq.${user.id},to_uid.eq.${selected.id}),and(from_uid.eq.${selected.id},to_uid.eq.${user.id})`)
         .order('sent_at',{ascending:true}).limit(100)
+      if(loadErr) console.error('[MSG LOAD ERROR]',loadErr)
       setMessages(data||[])
       await supabase.from('med_messages').update({read:true}).eq('to_uid',user.id).eq('from_uid',selected.id).eq('read',false)
       setUnread(p=>{const n={...p};delete n[selected.id];return n})
@@ -130,11 +131,23 @@ function Inner(){
     }
     setMessages(prev=>[...prev,optimistic])
     try{
-      const {data:inserted}=await supabase.from('med_messages').insert({
-        tenant_id:user.tenant_id,from_uid:user.id,to_uid:selected.id,
-        body:b||'',read:false,msg_type:fd?.type||'text',
-        file_url:fd?.url||null,file_name:fd?.name||null,file_type:fd?.mime||null
-      }).select('id,from_uid,to_uid,body,read,sent_at,file_url,file_name,file_type,msg_type').single()
+      const insertPayload={
+        from_uid:user.id,
+        to_uid:selected.id,
+        body:b||'',
+        read:false,
+        msg_type:fd?.type||'text',
+        file_url:fd?.url||null,
+        file_name:fd?.name||null,
+        file_type:fd?.mime||null,
+      }
+      // Ajouter tenant_id seulement s'il existe
+      if(user.tenant_id) insertPayload.tenant_id=user.tenant_id
+      const {data:inserted,error:insertErr}=await supabase.from('med_messages')
+        .insert(insertPayload)
+        .select('id,from_uid,to_uid,body,read,sent_at,file_url,file_name,file_type,msg_type')
+        .single()
+      if(insertErr) console.error('[MSG INSERT ERROR]',insertErr)
       // Remplacer le message optimiste par le vrai
       if(inserted){
         setMessages(prev=>prev.map(m=>m.id===optimistic.id?inserted:m))
