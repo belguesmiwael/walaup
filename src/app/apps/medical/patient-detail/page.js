@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, User, Phone, MapPin, Heart, AlertCircle,
@@ -246,7 +246,7 @@ function initials(fn, ln) {
   return `${(fn||'')[0]||''}${(ln||'')[0]||''}`.toUpperCase()
 }
 
-export default function PatientDetail() {
+function PatientDetailInner() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const patientId    = searchParams.get('id')
@@ -533,5 +533,17 @@ export default function PatientDetail() {
         </div>
       </div>
     </>
+  )
+}
+
+export default function PatientDetail() {
+  return (
+    <Suspense fallback={
+      <div style={{ background:'var(--bg-base)', minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ width:140, height:8, borderRadius:4, background:'var(--bg-surface)' }} />
+      </div>
+    }>
+      <PatientDetailInner />
+    </Suspense>
   )
 }
