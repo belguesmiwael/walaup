@@ -736,7 +736,12 @@ export default function DoctorDashboard() {
     setSaving(true)
     try {
       await supabase.schema('medical').from('patients').insert({
-        ...ptForm, allergies: [], chronic_cond: [], current_meds: [],
+        ...ptForm,
+        tenant_id:   user.tenant_id,
+        created_by:  user.id,
+        allergies:   [],
+        chronic_cond:[],
+        current_meds:[],
       })
       showToast('Patient créé avec succès')
       setShowNewPatient(false)
@@ -758,7 +763,10 @@ export default function DoctorDashboard() {
     try {
       const { data: { user: u } } = await supabase.auth.getUser()
       await supabase.schema('medical').from('appointments').insert({
-        ...apptForm, status: 'pending', created_by: u.id,
+        ...apptForm,
+        tenant_id:  user.tenant_id,
+        status:     'pending',
+        created_by: user.id,
       })
       showToast('Rendez-vous créé')
       setShowNewAppt(false)
