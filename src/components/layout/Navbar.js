@@ -18,6 +18,9 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
 
+  // Masquer sur toutes les pages apps (chaque app a son propre layout)
+  if (pathname?.startsWith('/apps/')) return null
+
   const handleScroll = useCallback(() => {
     setScrolled(window.scrollY > 24)
   }, [])

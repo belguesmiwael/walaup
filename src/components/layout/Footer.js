@@ -1,4 +1,6 @@
+'use client'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
 const FOOTER_LINKS = {
   'Solutions': [
@@ -23,6 +25,10 @@ const FOOTER_LINKS = {
 }
 
 export default function Footer() {
+  const pathname = usePathname()
+  // Masquer sur toutes les pages apps (chaque app a son propre layout)
+  if (pathname?.startsWith('/apps/')) return null
+
   const year = new Date().getFullYear()
 
   return (
