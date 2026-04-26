@@ -1255,6 +1255,23 @@ export default function DoctorDashboard() {
                 </div>
               </>
             )}
+            {/* ══ TAB : CRÉNEAUX ══ */}
+            {tab === 'creneaux' && user && (
+              <>
+                <div className="md-section-header">
+                  <div>
+                    <div className="md-section-title">Créneaux & Agenda</div>
+                    <div className="md-section-sub">Cliquez sur un créneau libre pour réserver</div>
+                  </div>
+                </div>
+                <MedicalCalendar
+                  tenantId={user.tenant_id}
+                  userId={user.id}
+                  userRole={user.role}
+                  readOnly={false}
+                />
+              </>
+            )}
           </main>
         </div>
 
@@ -1425,24 +1442,6 @@ export default function DoctorDashboard() {
             </form>
           </div>
         </div>
-      )}
-
-      {/* ══ TAB : CRÉNEAUX ══ */}
-      {tab === 'creneaux' && user && (
-        <>
-          <div className="md-section-header">
-            <div>
-              <div className="md-section-title">Créneaux & Agenda</div>
-              <div className="md-section-sub">Cliquez sur un créneau libre pour réserver</div>
-            </div>
-          </div>
-          <MedicalCalendar
-            tenantId={user.tenant_id}
-            userId={user.id}
-            userRole={user.role}
-            readOnly={false}
-          />
-        </>
       )}
 
       {/* ── ProfileModal ── */}

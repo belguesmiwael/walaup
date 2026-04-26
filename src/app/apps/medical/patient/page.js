@@ -410,23 +410,13 @@ export default function PatientPortal() {
                 tenantId={user.tenant_id}
                 userId={user.id}
                 userRole={user.role}
-                readOnly={true}
+                readOnly={false}
               />
             </div>
           )}
 
-          {/* MESSAGES */}
-          {tab === 'messages' && (
-            <div className="pt-card">
-              <div className="pt-card-header">
-                <div className="pt-card-title"><MessageSquare size={16} color="#0EA5E9"/>Messages</div>
-              </div>
-              <div className="pt-empty">
-                <MessageSquare size={30} style={{ margin:'0 auto 8px', display:'block', opacity:.3 }}/>
-                Messagerie avec votre médecin — Prochainement
-              </div>
-            </div>
-          )}
+          {/* MESSAGES — redirect vers messagerie dédiée */}
+          {tab === 'messages' && router.push('/apps/medical/messagerie') && null}
         </div>
 
         {/* Bottom nav */}
