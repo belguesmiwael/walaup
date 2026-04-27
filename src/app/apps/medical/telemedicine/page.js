@@ -1,72 +1,104 @@
 'use client'
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Video, VideoOff, Mic, MicOff, PhoneOff, Copy, Users, Loader } from 'lucide-react'
+import { Video, VideoOff, Mic, MicOff, PhoneOff, Copy, Users, CheckCircle2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-
-const CSS = `
-  .tv-root { position:fixed; inset:0; background:#0A0A0F; display:flex; flex-direction:column; overflow:hidden; }
-  .tv-header { height:54px; display:flex; align-items:center; padding:0 20px; gap:12px; flex-shrink:0;
-    background:rgba(0,0,0,.6); border-bottom:1px solid rgba(255,255,255,.08); backdrop-filter:blur(20px); z-index:100; }
-  .tv-logo { font-family:var(--font-display); font-weight:800; font-size:.95rem;
-    background:linear-gradient(135deg,#0EA5E9,#38BDF8); -webkit-background-clip:text;
-    -webkit-text-fill-color:transparent; background-clip:text; }
-  .tv-room { font-size:.72rem; color:rgba(255,255,255,.4); }
-  .tv-status { display:flex; align-items:center; gap:6px; margin-left:auto;
-    font-size:.75rem; font-weight:600; }
-  .tv-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-  .tv-dot.connecting { background:var(--gold); animation:tvPulse 1.2s infinite; }
-  .tv-dot.connected   { background:var(--green); }
-  .tv-dot.waiting     { background:rgba(255,255,255,.3); }
-  @keyframes tvPulse { 0%,100%{opacity:1}50%{opacity:.3} }
-
-  /* ── Video grid ── */
-  .tv-videos { flex:1; position:relative; overflow:hidden; }
-  .tv-remote { width:100%; height:100%; object-fit:cover; background:#111; }
-  .tv-local { position:absolute; bottom:80px; right:16px; width:160px; height:120px;
-    border-radius:14px; overflow:hidden; border:2px solid rgba(255,255,255,.2);
-    box-shadow:0 4px 20px rgba(0,0,0,.6); z-index:10; }
-  .tv-local video { width:100%; height:100%; object-fit:cover; }
-  .tv-waiting { width:100%; height:100%; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; gap:16px; }
-  .tv-waiting-icon { width:80px; height:80px; border-radius:50%;
-    background:rgba(14,165,233,.15); display:flex; align-items:center; justify-content:center;
-    border:2px solid rgba(14,165,233,.3); animation:tvPulse 2s infinite; }
-  .tv-waiting-text { color:rgba(255,255,255,.7); font-size:.9rem; font-weight:600; }
-  .tv-waiting-sub { color:rgba(255,255,255,.35); font-size:.78rem; margin-top:4px; text-align:center; }
-  .tv-link-box { background:rgba(14,165,233,.1); border:1px solid rgba(14,165,233,.25);
-    border-radius:12px; padding:12px 16px; max-width:380px; text-align:center; }
-  .tv-link-text { font-size:.75rem; color:rgba(255,255,255,.5); word-break:break-all; }
-  .tv-copy-btn { display:flex; align-items:center; gap:6px; margin:10px auto 0;
-    padding:7px 16px; border-radius:8px; background:rgba(14,165,233,.2); border:1px solid rgba(14,165,233,.4);
-    color:#38BDF8; font-size:.78rem; font-weight:700; cursor:pointer; transition:all .15s; width:fit-content; }
-  .tv-copy-btn:hover { background:rgba(14,165,233,.35); }
-
-  /* ── Controls ── */
-  .tv-controls { position:absolute; bottom:0; left:0; right:0;
-    padding:16px; display:flex; align-items:center; justify-content:center; gap:12px;
-    background:linear-gradient(to top,rgba(0,0,0,.8),transparent); z-index:20; }
-  .tv-ctrl { width:52px; height:52px; border-radius:50%; border:none;
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer; transition:all .2s; }
-  .tv-ctrl.mic  { background:rgba(255,255,255,.15); color:white; }
-  .tv-ctrl.mic:hover  { background:rgba(255,255,255,.25); }
-  .tv-ctrl.cam  { background:rgba(255,255,255,.15); color:white; }
-  .tv-ctrl.cam:hover  { background:rgba(255,255,255,.25); }
-  .tv-ctrl.end  { background:#DC2626; color:white; width:58px; height:58px; }
-  .tv-ctrl.end:hover  { background:#B91C1C; transform:scale(1.08); }
-  .tv-ctrl.off  { background:rgba(220,38,38,.2); color:#F87171; }
-  .tv-toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
-    padding:9px 18px; border-radius:10px; background:rgba(14,165,233,.9); color:white;
-    font-size:.82rem; font-weight:600; z-index:9999; animation:tvFade .2s; pointer-events:none; }
-  @keyframes tvFade { from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
-`
 
 const ICE = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
   ]
+}
+
+const CSS = `
+  .tv { position:fixed; inset:0; background:#050A12; display:flex; flex-direction:column; overflow:hidden; }
+  .tv-hdr { position:absolute; top:0; left:0; right:0; z-index:50; height:52px;
+    display:flex; align-items:center; padding:0 16px; gap:10px;
+    background:linear-gradient(to bottom,rgba(0,0,0,.8),transparent); }
+  .tv-logo { font-family:var(--font-display); font-weight:800; font-size:.88rem;
+    background:linear-gradient(135deg,#0EA5E9,#38BDF8);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+  .tv-room { font-size:.68rem; color:rgba(255,255,255,.3); font-family:monospace; }
+  .tv-sep { flex:1; }
+  .tv-pill { display:flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px;
+    font-size:.68rem; font-weight:700; background:rgba(0,0,0,.6);
+    border:1px solid rgba(255,255,255,.1); color:white; }
+  .tv-dot { width:7px; height:7px; border-radius:50%; }
+  .tv-dot.w { background:rgba(255,255,255,.3); }
+  .tv-dot.c { background:#FCD34D; animation:tvblink 1s infinite; }
+  .tv-dot.l { background:#34D399; box-shadow:0 0 8px #34D399; }
+  @keyframes tvblink { 0%,100%{opacity:1}50%{opacity:.2} }
+
+  /* Videos */
+  .tv-videos { flex:1; position:relative; background:#0A0A14; }
+  video.tv-remote { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .tv-remote-off { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:14px; color:rgba(255,255,255,.25); }
+  .tv-remote-avatar { width:90px; height:90px; border-radius:50%;
+    background:linear-gradient(135deg,rgba(14,165,233,.3),rgba(56,189,248,.1));
+    display:flex; align-items:center; justify-content:center;
+    border:2px solid rgba(14,165,233,.2); }
+  .tv-remote-name { font-size:.88rem; font-weight:600; color:rgba(255,255,255,.4); }
+
+  /* Local PiP */
+  .tv-local { position:absolute; bottom:90px; right:14px; width:160px; height:118px;
+    border-radius:14px; overflow:hidden; border:2px solid rgba(255,255,255,.15);
+    box-shadow:0 4px 24px rgba(0,0,0,.8); z-index:20; background:#111; }
+  video.tv-local-v { width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+  .tv-cam-off { position:absolute; inset:0; background:#111; display:flex;
+    align-items:center; justify-content:center; color:rgba(255,255,255,.2); font-size:.7rem; }
+  .tv-pip-label { position:absolute; bottom:5px; left:8px; font-size:.58rem;
+    color:rgba(255,255,255,.6); font-weight:600; text-shadow:0 1px 3px rgba(0,0,0,.9); }
+
+  /* Waiting screen */
+  .tv-waiting { position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:20px; padding:20px; }
+  .tv-waiting-icon { width:80px; height:80px; border-radius:50%;
+    background:rgba(14,165,233,.12); display:flex; align-items:center; justify-content:center;
+    border:2px solid rgba(14,165,233,.25); animation:tvpulse 2s infinite; }
+  @keyframes tvpulse { 0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.04)} }
+  .tv-waiting-title { color:rgba(255,255,255,.8); font-size:.95rem; font-weight:700; }
+  .tv-waiting-sub { color:rgba(255,255,255,.3); font-size:.78rem; }
+  .tv-link-box { background:rgba(14,165,233,.07); border:1px solid rgba(14,165,233,.2);
+    border-radius:12px; padding:12px 16px; max-width:380px; width:100%; text-align:center; }
+  .tv-link-url { font-size:.7rem; color:rgba(255,255,255,.4); word-break:break-all; margin-bottom:10px; font-family:monospace; }
+  .tv-copy { display:flex; align-items:center; gap:6px; margin:0 auto; padding:7px 18px;
+    border-radius:9px; background:rgba(14,165,233,.15); border:1px solid rgba(14,165,233,.35);
+    color:#38BDF8; font-size:.78rem; font-weight:700; cursor:pointer; transition:all .15s;
+    width:fit-content; }
+  .tv-copy:hover { background:rgba(14,165,233,.28); }
+  .tv-copy.ok { background:rgba(16,185,129,.15); border-color:rgba(16,185,129,.35); color:#34D399; }
+
+  /* Controls */
+  .tv-ctrl-bar { position:absolute; bottom:0; left:0; right:0; z-index:30;
+    padding:14px 20px; display:flex; align-items:center; justify-content:center; gap:12px;
+    background:linear-gradient(to top,rgba(0,0,0,.85) 60%,transparent); }
+  .tv-btn { width:52px; height:52px; border-radius:50%; border:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition:all .2s; }
+  .tv-btn.on  { background:rgba(255,255,255,.15); color:white; }
+  .tv-btn.on:hover  { background:rgba(255,255,255,.28); transform:scale(1.08); }
+  .tv-btn.off { background:rgba(248,113,113,.2); color:#F87171; border:1px solid rgba(248,113,113,.3); }
+  .tv-btn.off:hover { background:rgba(248,113,113,.35); }
+  .tv-btn.end { background:#DC2626; color:white; width:58px; height:58px; }
+  .tv-btn.end:hover { background:#B91C1C; transform:scale(1.1); }
+
+  /* Debug */
+  .tv-debug { position:absolute; top:60px; left:12px; font-size:.62rem; font-family:monospace;
+    color:rgba(255,255,255,.25); z-index:40; pointer-events:none; max-width:280px; }
+
+  /* Toast */
+  .tv-toast { position:absolute; top:60px; left:50%; transform:translateX(-50%);
+    padding:8px 16px; border-radius:10px; background:rgba(16,185,129,.9); color:white;
+    font-size:.78rem; font-weight:700; z-index:9999; animation:tvslide .2s; white-space:nowrap; }
+  @keyframes tvslide { from{opacity:0;transform:translateX(-50%) translateY(-8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+`
+
+// ── Peer ID unique par session ──────────────────────────────────────────────
+function makePeerId() {
+  return Math.random().toString(36).slice(2, 10)
 }
 
 function TelemedecineInner() {
@@ -74,257 +106,379 @@ function TelemedecineInner() {
   const searchParams = useSearchParams()
   const roomId       = searchParams.get('room') || 'default'
 
-  const [user,       setUser]       = useState(null)
-  const [status,     setStatus]     = useState('waiting') // waiting | connecting | connected
-  const [micOn,      setMicOn]      = useState(true)
-  const [camOn,      setCamOn]      = useState(true)
-  const [toast,      setToast]      = useState('')
-  const [copied,     setCopied]     = useState(false)
+  const [status,  setStatus]  = useState('waiting') // waiting | connecting | connected
+  const [micOn,   setMicOn]   = useState(true)
+  const [camOn,   setCamOn]   = useState(true)
+  const [copied,  setCopied]  = useState(false)
+  const [toast,   setToast]   = useState('')
+  const [remoteName, setRemoteName] = useState('')
+  const [debugLog,   setDebugLog]   = useState([])
+  const [peersCount, setPeersCount] = useState(1)
 
   const localRef   = useRef(null)
   const remoteRef  = useRef(null)
   const pcRef      = useRef(null)
   const streamRef  = useRef(null)
-  const subsRef    = useRef([])
+  const channelRef = useRef(null)
+  const myPeerId   = useRef(makePeerId())
+  const isCaller   = useRef(false)
+  const pendingCandidates = useRef([])
 
-  const joinUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/apps/medical/telemedicine?room=${roomId}`
-    : ''
-
-  /* ── Auth ── */
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user: u } }) => {
-      if (!u) { router.push('/apps/medical/login'); return }
-      setUser(u)
-      startSession(u)
-    })
-    return () => cleanup()
+  const log = useCallback((msg) => {
+    console.log('[WebRTC]', msg)
+    setDebugLog(d => [...d.slice(-6), msg])
   }, [])
-
-  async function cleanup() {
-    subsRef.current.forEach(s => s?.unsubscribe())
-    if (pcRef.current) { pcRef.current.close(); pcRef.current = null }
-    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()) }
-    // Nettoyer signaling Supabase
-    await supabase.from('med_signaling').delete().eq('room_id', roomId).eq('user_id', user?.id || '')
-  }
-
-  async function startSession(u) {
-    try {
-      // Obtenir stream local
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      streamRef.current = stream
-      if (localRef.current) localRef.current.srcObject = stream
-
-      // Créer PeerConnection
-      const pc = new RTCPeerConnection(ICE)
-      pcRef.current = pc
-      stream.getTracks().forEach(t => pc.addTrack(t, stream))
-
-      pc.ontrack = e => {
-        if (remoteRef.current) remoteRef.current.srcObject = e.streams[0]
-        setStatus('connected')
-      }
-      pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
-          setStatus('waiting')
-        }
-      }
-
-      // Vérifier si quelqu'un attend déjà dans la room
-      const { data: existing } = await supabase.from('med_signaling')
-        .select('*').eq('room_id', roomId).neq('user_id', u.id).limit(1)
-
-      if (existing?.length > 0 && existing[0].type === 'offer') {
-        // Rejoindre en tant que callee
-        await joinAsCallee(pc, existing[0], u)
-      } else {
-        // Créer l'offre en tant que caller
-        await createOffer(pc, u)
-      }
-
-      // Écouter les ICE candidates
-      pc.onicecandidate = async ({ candidate }) => {
-        if (candidate) {
-          await supabase.from('med_signaling').insert({
-            room_id: roomId, user_id: u.id,
-            type: 'ice', payload: JSON.stringify(candidate)
-          })
-        }
-      }
-
-    } catch (err) {
-      showToast('Caméra/micro non disponible')
-    }
-  }
-
-  async function createOffer(pc, u) {
-    setStatus('connecting')
-    const offer = await pc.createOffer()
-    await pc.setLocalDescription(offer)
-
-    await supabase.from('med_signaling').insert({
-      room_id: roomId, user_id: u.id,
-      type: 'offer', payload: JSON.stringify(offer)
-    })
-
-    // Écouter la réponse
-    const sub = supabase.channel(`sig_${roomId}_answer`)
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'med_signaling',
-        filter: `room_id=eq.${roomId}`
-      }, async ({ new: row }) => {
-        if (row.user_id === u.id) return
-        if (row.type === 'answer') {
-          await pc.setRemoteDescription(JSON.parse(row.payload))
-          setStatus('connected')
-        }
-        if (row.type === 'ice') {
-          try { await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(row.payload))) } catch {}
-        }
-      }).subscribe()
-    subsRef.current.push(sub)
-  }
-
-  async function joinAsCallee(pc, offerRow, u) {
-    setStatus('connecting')
-    await pc.setRemoteDescription(JSON.parse(offerRow.payload))
-    const answer = await pc.createAnswer()
-    await pc.setLocalDescription(answer)
-
-    await supabase.from('med_signaling').insert({
-      room_id: roomId, user_id: u.id,
-      type: 'answer', payload: JSON.stringify(answer)
-    })
-
-    // Écouter les ICE du caller
-    const sub = supabase.channel(`sig_${roomId}_ice`)
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'med_signaling',
-        filter: `room_id=eq.${roomId}`
-      }, async ({ new: row }) => {
-        if (row.user_id === u.id) return
-        if (row.type === 'ice') {
-          try { await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(row.payload))) } catch {}
-        }
-      }).subscribe()
-    subsRef.current.push(sub)
-  }
-
-  function toggleMic() {
-    if (!streamRef.current) return
-    streamRef.current.getAudioTracks().forEach(t => { t.enabled = !t.enabled })
-    setMicOn(on => !on)
-  }
-
-  function toggleCam() {
-    if (!streamRef.current) return
-    streamRef.current.getVideoTracks().forEach(t => { t.enabled = !t.enabled })
-    setCamOn(on => !on)
-  }
-
-  function endCall() {
-    cleanup()
-    router.push(BACK_ROUTES[user?.role] || '/apps/medical/login')
-  }
-
-  function copyLink() {
-    navigator.clipboard.writeText(joinUrl).then(() => {
-      setCopied(true)
-      showToast('Lien copié !')
-      setTimeout(() => setCopied(false), 2000)
-    })
-  }
 
   function showToast(msg) {
     setToast(msg)
-    setTimeout(() => setToast(''), 2500)
+    setTimeout(() => setToast(''), 3000)
   }
 
-  const BACK_ROUTES = {
-    tenant_admin: '/apps/medical/doctor',
-    tenant_user:  '/apps/medical/secretary',
-    app_end_user: '/apps/medical/patient',
+  // ── Initialiser WebRTC ───────────────────────────────────────────────────
+  const initWebRTC = useCallback(async () => {
+    log('Getting user media...')
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    streamRef.current = stream
+    if (localRef.current) {
+      localRef.current.srcObject = stream
+      localRef.current.play().catch(() => {})
+    }
+
+    const pc = new RTCPeerConnection(ICE)
+    pcRef.current = pc
+
+    // Ajouter les tracks locaux
+    stream.getTracks().forEach(track => {
+      pc.addTrack(track, stream)
+      log(`Added track: ${track.kind}`)
+    })
+
+    // Recevoir les tracks distants
+    pc.ontrack = (e) => {
+      log(`Remote track received: ${e.track.kind}`)
+      if (remoteRef.current && e.streams[0]) {
+        remoteRef.current.srcObject = e.streams[0]
+        remoteRef.current.play().catch(() => {})
+        setStatus('connected')
+        showToast('Connexion établie ✓')
+      }
+    }
+
+    // ICE candidates
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        log(`ICE candidate: ${e.candidate.type}`)
+        channelRef.current?.send({
+          type: 'broadcast',
+          event: 'ice',
+          payload: { from: myPeerId.current, candidate: e.candidate }
+        })
+      }
+    }
+
+    pc.oniceconnectionstatechange = () => {
+      log(`ICE state: ${pc.iceConnectionState}`)
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        setStatus('connected')
+      }
+      if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+        setStatus('waiting')
+        log('Connection lost, resetting...')
+      }
+    }
+
+    pc.onnegotiationneeded = () => {
+      log('Negotiation needed')
+    }
+
+    return pc
+  }, [log])
+
+  // ── Créer l'offre (caller) ──────────────────────────────────────────────
+  const createOffer = useCallback(async (pc) => {
+    log('Creating offer...')
+    isCaller.current = true
+    setStatus('connecting')
+    const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true })
+    await pc.setLocalDescription(offer)
+    log('Local description set (offer)')
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'offer',
+      payload: { from: myPeerId.current, sdp: offer }
+    })
+  }, [log])
+
+  // ── Répondre à l'offre (callee) ─────────────────────────────────────────
+  const handleOffer = useCallback(async (sdp, fromId) => {
+    if (!pcRef.current) return
+    log(`Received offer from ${fromId}`)
+    setStatus('connecting')
+    await pcRef.current.setRemoteDescription(new RTCSessionDescription(sdp))
+
+    // Ajouter les candidats en attente
+    for (const c of pendingCandidates.current) {
+      await pcRef.current.addIceCandidate(new RTCIceCandidate(c))
+      log('Added pending ICE candidate')
+    }
+    pendingCandidates.current = []
+
+    const answer = await pcRef.current.createAnswer()
+    await pcRef.current.setLocalDescription(answer)
+    log('Local description set (answer)')
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'answer',
+      payload: { from: myPeerId.current, to: fromId, sdp: answer }
+    })
+  }, [log])
+
+  // ── Recevoir la réponse ──────────────────────────────────────────────────
+  const handleAnswer = useCallback(async (sdp) => {
+    if (!pcRef.current) return
+    log('Received answer')
+    await pcRef.current.setRemoteDescription(new RTCSessionDescription(sdp))
+  }, [log])
+
+  // ── Recevoir ICE candidate ───────────────────────────────────────────────
+  const handleIce = useCallback(async (candidate) => {
+    if (!pcRef.current) return
+    if (!pcRef.current.remoteDescription) {
+      pendingCandidates.current.push(candidate)
+      log('ICE candidate queued (no remote desc yet)')
+      return
+    }
+    try {
+      await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate))
+      log('ICE candidate added')
+    } catch (e) {
+      log(`ICE error: ${e.message}`)
+    }
+  }, [log])
+
+  // ── Main setup ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    let mounted = true
+
+    async function start() {
+      try {
+        const pc = await initWebRTC()
+        if (!mounted) return
+
+        // Channel Supabase Realtime — Broadcast (pas de DB, P2P via serveur Supabase)
+        const channel = supabase.channel(`medilink_room_${roomId}`, {
+          config: { broadcast: { self: false } }
+        })
+        channelRef.current = channel
+
+        // Écouter les messages de signalisation
+        channel
+          .on('broadcast', { event: 'join' }, ({ payload }) => {
+            if (payload.peerId === myPeerId.current) return
+            log(`Peer joined: ${payload.peerId}`)
+            setRemoteName(payload.name || 'Participant')
+            setPeersCount(2)
+            // Je suis le premier → je crée l'offre
+            if (!isCaller.current && !pcRef.current?.remoteDescription) {
+              createOffer(pc)
+            }
+          })
+          .on('broadcast', { event: 'offer' }, ({ payload }) => {
+            if (payload.from === myPeerId.current) return
+            handleOffer(payload.sdp, payload.from)
+          })
+          .on('broadcast', { event: 'answer' }, ({ payload }) => {
+            if (payload.from === myPeerId.current) return
+            if (payload.to && payload.to !== myPeerId.current) return
+            handleAnswer(payload.sdp)
+          })
+          .on('broadcast', { event: 'ice' }, ({ payload }) => {
+            if (payload.from === myPeerId.current) return
+            handleIce(payload.candidate)
+          })
+          .on('broadcast', { event: 'leave' }, ({ payload }) => {
+            if (payload.from === myPeerId.current) return
+            log('Peer left')
+            setStatus('waiting')
+            setRemoteName('')
+            setPeersCount(1)
+            if (remoteRef.current) remoteRef.current.srcObject = null
+          })
+          .on('presence', { event: 'sync' }, () => {
+            const state = channel.presenceState()
+            const count = Object.keys(state).length
+            setPeersCount(count)
+            log(`Presence: ${count} peer(s)`)
+          })
+          .on('presence', { event: 'join' }, ({ newPresences }) => {
+            const other = newPresences.filter(p => p.peer_id !== myPeerId.current)
+            if (other.length > 0) {
+              log(`Presence join: ${other[0].peer_id}`)
+              setRemoteName(other[0].name || 'Participant')
+              // Délai pour laisser le channel se stabiliser
+              setTimeout(() => {
+                if (!pcRef.current?.remoteDescription) {
+                  createOffer(pcRef.current)
+                }
+              }, 500)
+            }
+          })
+          .on('presence', { event: 'leave' }, () => {
+            setStatus('waiting')
+            setRemoteName('')
+            if (remoteRef.current) remoteRef.current.srcObject = null
+          })
+          .subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+              log('Channel subscribed, tracking presence...')
+              // Track ma présence
+              await channel.track({
+                peer_id: myPeerId.current,
+                name: 'Médecin',
+                joined_at: Date.now(),
+              })
+              // Annoncer mon arrivée
+              channel.send({
+                type: 'broadcast',
+                event: 'join',
+                payload: { peerId: myPeerId.current, name: 'Médecin' }
+              })
+            }
+          })
+
+      } catch (err) {
+        log(`Error: ${err.message}`)
+        console.error(err)
+      }
+    }
+
+    start()
+
+    return () => {
+      mounted = false
+      // Annoncer le départ
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'leave',
+        payload: { from: myPeerId.current }
+      })
+      channelRef.current?.unsubscribe()
+      if (pcRef.current) { pcRef.current.close(); pcRef.current = null }
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
+    }
+  }, [roomId, initWebRTC, createOffer, handleOffer, handleAnswer, handleIce, log])
+
+  // ── Controls ─────────────────────────────────────────────────────────────
+  function toggleMic() {
+    streamRef.current?.getAudioTracks().forEach(t => { t.enabled = !micOn })
+    setMicOn(m => !m)
   }
 
-  const statusText = {
-    waiting:    'En attente',
-    connecting: 'Connexion…',
-    connected:  'En ligne',
+  function toggleCam() {
+    streamRef.current?.getVideoTracks().forEach(t => { t.enabled = !camOn })
+    setCamOn(c => !c)
   }
-  const statusColor = {
-    waiting: 'rgba(255,255,255,.3)',
-    connecting: 'var(--gold)',
-    connected: 'var(--green)',
+
+  function endCall() {
+    channelRef.current?.send({
+      type: 'broadcast', event: 'leave',
+      payload: { from: myPeerId.current }
+    })
+    channelRef.current?.unsubscribe()
+    if (pcRef.current) { pcRef.current.close(); pcRef.current = null }
+    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
+    router.push('/apps/medical/doctor')
   }
+
+  function copyLink() {
+    const url = window.location.href
+    navigator.clipboard.writeText(url)
+    setCopied(true)
+    showToast('Lien copié !')
+    setTimeout(() => setCopied(false), 3000)
+  }
+
+  const joinUrl  = typeof window !== 'undefined' ? window.location.href : ''
+  const statusLabel = { waiting:'En attente', connecting:'Connexion…', connected:'En ligne' }
+  const statusCls   = { waiting:'w', connecting:'c', connected:'l' }
 
   return (
     <>
       <style>{CSS}</style>
-      <div className="tv-root">
+      <div className="tv">
         {/* Header */}
-        <div className="tv-header">
+        <div className="tv-hdr">
           <span className="tv-logo">MediLink OS</span>
-          <span className="tv-room">Salle: {roomId.slice(-8)}</span>
-          <div className="tv-status">
-            <div className="tv-dot" style={{ background: statusColor[status] }}/>
-            <span style={{ color: statusColor[status] }}>{statusText[status]}</span>
+          <span className="tv-room">#{roomId.slice(-8).toUpperCase()}</span>
+          <span className="tv-sep"/>
+          <div className="tv-pill">
+            <div className={`tv-dot ${statusCls[status]}`}/>
+            <span>{statusLabel[status]}</span>
+            {peersCount > 1 && <span style={{ marginLeft:4, color:'rgba(255,255,255,.4)' }}>· {peersCount}</span>}
           </div>
         </div>
 
         {/* Videos */}
         <div className="tv-videos">
           {/* Vidéo distante */}
-          <video
-            ref={remoteRef}
-            className="tv-remote"
-            autoPlay
-            playsInline
-            style={{ display: status === 'connected' ? 'block' : 'none' }}
-          />
-
-          {/* Écran d'attente */}
-          {status !== 'connected' && (
-            <div className="tv-waiting">
-              <div className="tv-waiting-icon">
-                <Users size={32} color="#0EA5E9"/>
+          {status === 'connected' ? (
+            <video
+              ref={remoteRef}
+              className="tv-remote"
+              autoPlay
+              playsInline
+              style={{ display: status === 'connected' ? 'block' : 'none' }}
+            />
+          ) : (
+            <div className="tv-remote-off">
+              <div className="tv-remote-avatar">
+                <Users size={32} color="rgba(56,189,248,.5)"/>
               </div>
-              <div>
-                <div className="tv-waiting-text">
-                  {status === 'connecting' ? 'Connexion en cours…' : 'En attente d\'un participant'}
-                </div>
-                <div className="tv-waiting-sub">
-                  Partagez ce lien pour inviter quelqu'un
-                </div>
+              <div className="tv-waiting-title">
+                {status === 'connecting' ? 'Connexion en cours…' : 'Salle ouverte — en attente'}
+              </div>
+              <div style={{ color:'rgba(255,255,255,.3)', fontSize:'.78rem' }}>
+                Partagez le lien pour inviter un participant
               </div>
               <div className="tv-link-box">
-                <div className="tv-link-text">{joinUrl}</div>
-                <div className="tv-copy-btn" onClick={copyLink}>
-                  <Copy size={13}/> {copied ? 'Copié !' : 'Copier le lien'}
+                <div className="tv-link-url">{joinUrl}</div>
+                <div className={`tv-copy ${copied?'ok':''}`} onClick={copyLink}>
+                  {copied ? <><CheckCircle2 size={13}/> Copié !</> : <><Copy size={13}/> Copier le lien</>}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Vidéo locale (PiP) */}
+          {/* Vidéo locale PiP — toujours visible */}
           <div className="tv-local">
-            <video ref={localRef} autoPlay playsInline muted/>
+            {camOn
+              ? <video ref={localRef} className="tv-local-v" autoPlay playsInline muted/>
+              : <div className="tv-cam-off"><VideoOff size={20}/></div>}
+            <div className="tv-pip-label">Vous</div>
           </div>
 
-          {/* Contrôles */}
-          <div className="tv-controls">
-            <button className={`tv-ctrl ${micOn ? 'mic' : 'off'}`} onClick={toggleMic}>
+          {/* Debug log discret */}
+          {debugLog.length > 0 && (
+            <div className="tv-debug">
+              {debugLog.slice(-4).map((l, i) => <div key={i}>▸ {l}</div>)}
+            </div>
+          )}
+
+          {/* Controls */}
+          <div className="tv-ctrl-bar">
+            <button className={`tv-btn ${micOn?'on':'off'}`} onClick={toggleMic} title={micOn?'Couper micro':'Activer micro'}>
               {micOn ? <Mic size={20}/> : <MicOff size={20}/>}
             </button>
-            <button className="tv-ctrl end" onClick={endCall}>
+            <button className="tv-btn end" onClick={endCall} title="Raccrocher">
               <PhoneOff size={22}/>
             </button>
-            <button className={`tv-ctrl ${camOn ? 'cam' : 'off'}`} onClick={toggleCam}>
+            <button className={`tv-btn ${camOn?'on':'off'}`} onClick={toggleCam} title={camOn?'Couper caméra':'Activer caméra'}>
               {camOn ? <Video size={20}/> : <VideoOff size={20}/>}
             </button>
           </div>
         </div>
 
+        {/* Toast */}
         {toast && <div className="tv-toast">{toast}</div>}
       </div>
     </>
@@ -334,8 +488,8 @@ function TelemedecineInner() {
 export default function Telemedicine() {
   return (
     <Suspense fallback={
-      <div style={{ background:'#0A0A0F', height:'100vh', display:'flex', alignItems:'center', justifyContent:'center' }}>
-        <Loader size={24} color="#0EA5E9" style={{ animation:'spin 1s linear infinite' }}/>
+      <div style={{ background:'#050A12', height:'100vh', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ color:'rgba(56,189,248,.5)', fontSize:'.85rem' }}>Connexion à la salle…</div>
       </div>
     }>
       <TelemedecineInner/>
