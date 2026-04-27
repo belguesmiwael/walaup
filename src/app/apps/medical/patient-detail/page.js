@@ -251,6 +251,7 @@ function PatientDetailInner() {
   const searchParams = useSearchParams()
   const patientId    = searchParams.get('id')
 
+  const router = useRouter()
   const [user,        setUser]        = useState(null)
   const [doctorName,  setDoctorName]  = useState('')
   const [patient,     setPatient]     = useState(null)
@@ -389,6 +390,15 @@ function PatientDetailInner() {
             </div>
           </div>
 
+          {/* CTA IA + Consultation */}
+          {isDoctor && (
+            <div style={{ display:'flex', gap:10, marginBottom:14 }}>
+              <button onClick={() => router.push('/apps/medical/ai?patient=' + patientId)}
+                style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'10px 16px', borderRadius:12, border:'1px solid rgba(99,102,241,.35)', background:'rgba(99,102,241,.08)', color:'#A78BFA', fontWeight:700, fontSize:'.82rem', cursor:'pointer' }}>
+                🧠 Analyser avec l'IA
+              </button>
+            </div>
+          )}
           {/* CTA Nouvelle consultation — médecin uniquement */}
           {isDoctor && (
             <div className="pd-cta" onClick={goToConsultation}>

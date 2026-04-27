@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, TrendingUp, Users, CalendarDays,
-  CheckCircle2, XCircle, RefreshCw, Lock
+  CheckCircle2, XCircle, RefreshCw, Download, Activity, Heart
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -126,6 +126,45 @@ const PERIODS = [
   { id: '90d', label: '3 mois' },
 ]
 
+function AdvancedAnalytics({ tenantId, daily, stats, period }) {
+  const [exporting, setExporting] = useState(false)
+
+  function exportCSV() {
+    setExporting(true)
+    const rows = [
+      ['Date', 'RDV Total', 'Terminés', 'Annulés', 'Nouveaux Patients'],
+      ...(daily||[]).map(d => [d.date, d.rdv, d.done, 0, d.new_pt])
+    ]
+    const csv = rows.map(r => r.join(',')).join('
+')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url; a.download = `analytics_${period}_${new Date().toISOString().slice(0,10)}.csv`
+    a.click(); URL.revokeObjectURL(url)
+    setExporting(false)
+  }
+
+  return (
+    <div style={{ marginBottom:16 }}>
+      <div style={{ background:'var(--bg-surface)', border:'1px solid var(--border)', borderRadius:14, padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+        <div>
+          <div style={{ fontWeight:700, fontSize:'.88rem', color:'var(--tx)', marginBottom:4 }}>
+            Analytics avancés ✅
+          </div>
+          <div style={{ fontSize:'.75rem', color:'var(--tx-3)' }}>
+            {stats?.total ?? 0} RDV · {stats?.new_patients ?? 0} nouveaux patients · Taux présence {stats?.taux_presence ?? 0}%
+          </div>
+        </div>
+        <button onClick={exportCSV} disabled={exporting}
+          style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:10, border:'1px solid rgba(14,165,233,.3)', background:'rgba(14,165,233,.08)', color:'#0EA5E9', fontWeight:700, fontSize:'.8rem', cursor:'pointer', transition:'all .15s' }}>
+          <Download size={14}/> {exporting ? 'Export…' : 'Exporter CSV'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function Analytics() {
   const router  = useRouter()
   const [user,    setUser]    = useState(null)
@@ -156,7 +195,7 @@ export default function Analytics() {
         // Check premium
         const { data: tenant } = await supabase.from('med_tenants')
           .select('support_active').eq('tenant_id', ud.tenant_id).maybeSingle()
-        setIsPremium(tenant?.support_active || false)
+        setIsPremium(true) // Toutes features débloquées
       } catch { router.push('/apps/medical/login') }
       finally { setLoading(false) }
     }
@@ -387,21 +426,8 @@ export default function Analytics() {
             ))}
           </div>
 
-          {/* Premium lock — Analytics avancés */}
-          {!isPremium && (
-            <div className="an-premium">
-              <div className="an-premium-icon"><Lock size={22}/></div>
-              <div className="an-premium-title">Analytics avancés — Premium</div>
-              <div className="an-premium-desc">
-                Revenus et facturation, cartographie des pathologies,
-                prédictions IA, export CSV et rapports personnalisés.
-              </div>
-              <button className="an-premium-btn"
-                onClick={() => alert('Contactez BizFlow TN pour activer le support mensuel')}>
-                Activer le support mensuel
-              </button>
-            </div>
-          )}
+          {/* Analytics avancés — toujours disponibles */}
+          <AdvancedAnalytics tenantId={user?.tenant_id} daily={daily} stats={stats} period={period}/>
         </div>
       </div>
     </>

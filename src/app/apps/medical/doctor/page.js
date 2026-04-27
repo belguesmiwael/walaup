@@ -532,6 +532,7 @@ const NAV = [
   { id: 'creneaux',  icon: CalendarDays,    label: 'Créneaux'         },
   { id: 'messages',  icon: MessageSquare,   label: 'Messages', isLink: '/apps/medical/messagerie' },
   { id: 'analytics', icon: TrendingUp,      label: 'Analytics', isLink: '/apps/medical/analytics' },
+  { id: 'ia',        icon: Activity,         label: 'IA', isLink: '/apps/medical/ai' },
   { id: 'parametres',icon: Settings,        label: 'Paramètres'       },
 ]
 
@@ -819,7 +820,7 @@ export default function DoctorDashboard() {
   )
 
   const doctorName = doctor?.doctor_name || user?.email || 'Médecin'
-  const isPremium  = doctor?.support_active || false
+  const isPremium  = true // Toutes features débloquées pour tous les médecins
 
   /* ── RENDER ── */
   return (
@@ -944,11 +945,8 @@ export default function DoctorDashboard() {
                     <div className="md-quick-icon gold"><Stethoscope size={20} /></div>
                     Consultation
                   </button>
-                  <button className={`md-quick-btn ${!isPremium ? 'premium' : ''}`}
-                    onClick={() => !isPremium && showToast('Fonctionnalité premium — Abonnement support mensuel requis', 'error')}>
-                    <div className="md-quick-icon violet">
-                      {isPremium ? <Video size={20} /> : <Lock size={20} />}
-                    </div>
+                  <button className="md-quick-btn" onClick={() => router.push('/apps/medical/telemedicine')}>
+                    <div className="md-quick-icon violet"><Video size={20}/></div>
                     Télémédecine
                   </button>
                 </div>
