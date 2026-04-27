@@ -6,6 +6,7 @@ import {
   LogOut, ChevronLeft, ChevronRight, Bell, Plus, Search,
   Clock, CheckCircle2, XCircle, AlertCircle, Activity,
   UserPlus, Stethoscope, Video, Lock, TrendingUp, RefreshCw,
+  Heart, FileText,
   Phone, ChevronRight as Arrow, Moon, Sun, Menu, X, BarChart2
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -526,14 +527,17 @@ const CSS = `
 
 /* ─── Nav config ──────────────────────────────────────────────────────────── */
 const NAV = [
-  { id: 'dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
-  { id: 'patients',  icon: Users,           label: 'Patients'         },
-  { id: 'agenda',    icon: CalendarDays,    label: 'Agenda'           },
-  { id: 'creneaux',  icon: CalendarDays,    label: 'Créneaux'         },
-  { id: 'messages',  icon: MessageSquare,   label: 'Messages', isLink: '/apps/medical/messagerie' },
-  { id: 'analytics', icon: TrendingUp,      label: 'Analytics', isLink: '/apps/medical/analytics' },
-  { id: 'ia',        icon: Activity,         label: 'IA', isLink: '/apps/medical/ai' },
-  { id: 'parametres',icon: Settings,        label: 'Paramètres'       },
+  { id: 'dashboard',    icon: LayoutDashboard, label: 'Dashboard'     },
+  { id: 'patients',     icon: Users,           label: 'Patients'      },
+  { id: 'creneaux',     icon: CalendarDays,    label: 'Créneaux'      },
+  { id: 'messages',     icon: MessageSquare,   label: 'Messages',     isLink: '/apps/medical/messagerie' },
+  { id: 'ia',           icon: Activity,        label: 'IA Médicale',  isLink: '/apps/medical/ai' },
+  { id: 'anatomie',     icon: Stethoscope,     label: 'Anatomie 3D',  isLink: '/apps/medical/anatomie' },
+  { id: 'vitals',       icon: Heart,           label: 'Vital Signs',  isLink: '/apps/medical/vitals' },
+  { id: 'prescription', icon: FileText,        label: 'Ordonnances',  isLink: '/apps/medical/prescription' },
+  { id: 'analytics',    icon: TrendingUp,      label: 'Analytics',    isLink: '/apps/medical/analytics' },
+  { id: 'telemedicine', icon: Video,           label: 'Télémédecine', isLink: '/apps/medical/telemedicine' },
+  { id: 'parametres',   icon: Settings,        label: 'Paramètres',   isLink: '/apps/medical/parametres' },
 ]
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
