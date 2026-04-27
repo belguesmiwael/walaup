@@ -251,7 +251,6 @@ function PatientDetailInner() {
   const searchParams = useSearchParams()
   const patientId    = searchParams.get('id')
 
-  const router = useRouter()
   const [user,        setUser]        = useState(null)
   const [doctorName,  setDoctorName]  = useState('')
   const [patient,     setPatient]     = useState(null)

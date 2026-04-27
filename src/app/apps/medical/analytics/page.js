@@ -135,8 +135,7 @@ function AdvancedAnalytics({ tenantId, daily, stats, period }) {
       ['Date', 'RDV Total', 'Terminés', 'Annulés', 'Nouveaux Patients'],
       ...(daily||[]).map(d => [d.date, d.rdv, d.done, 0, d.new_pt])
     ]
-    const csv = rows.map(r => r.join(',')).join('
-')
+    const csv = rows.map(r => r.join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
