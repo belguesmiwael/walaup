@@ -134,7 +134,7 @@ const ANATOMY = {
     color:'#A78BFA', hue:260,
     organs:[
       {id:'cerveau',    name:'Cerveau',         pos:[0,.38,.04],   r:.09,  desc:'100 milliards neurones',   diseases:['AVC','Épilepsie','Tumeur','Alzheimer','Méningite']},
-      {id:'cervelet',   name:'Cervelet',        pos:[0,.3,.-.04],  r:.055, desc:'Coordination motrice',     diseases:['Ataxie','Tumeur cérébelleux']},
+      {id:'cervelet',   name:'Cervelet',        pos:[0,.3,-.04],  r:.055, desc:'Coordination motrice',     diseases:['Ataxie','Tumeur cérébelleux']},
       {id:'moelle',     name:'Moelle épinière', pos:[0,.1,-.06],   r:.022, desc:'Transmission nerveuse',    diseases:['Traumatisme','SEP','Myélopathie']},
     ]
   },
@@ -240,7 +240,7 @@ function init3DScene(canvas, { activeSystem, selectedOrgan, patientConditions, v
       specular: 0x334488,
       shininess: 30,
       transparent: true,
-      opacity: viewMode === 'skeleton' ? 0.15 : 0.35,
+      opacity: viewMode === 'skeleton' ? 0.08 : viewMode === 'wireframe' ? 0.0 : 0.18,
       wireframe: viewMode === 'wireframe',
     })
 
@@ -254,7 +254,7 @@ function init3DScene(canvas, { activeSystem, selectedOrgan, patientConditions, v
 
     // Torse (simplifié avec des sphères empilées pour l'aspect organique)
     const torsoMat = skinMat.clone()
-    torsoMat.opacity = viewMode === 'skeleton' ? 0.1 : 0.25
+    torsoMat.opacity = viewMode === 'skeleton' ? 0.06 : viewMode === 'wireframe' ? 0.0 : 0.12
 
     for (let i = 0; i < 6; i++) {
       const r = .11 - i * .005
@@ -350,7 +350,7 @@ function init3DScene(canvas, { activeSystem, selectedOrgan, patientConditions, v
         specular: new THREE.Color(0xffffff),
         shininess: isSelected ? 120 : 80,
         transparent: true,
-        opacity: isSelected ? .95 : isAffected ? .9 : .75,
+        opacity: isSelected ? 1.0 : isAffected ? .95 : .82,
       })
 
       // Géométrie

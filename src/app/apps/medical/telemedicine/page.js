@@ -167,10 +167,19 @@ function Inner() {
   async function handleOffer(payload) {
     const pc = pcRef.current
     if (!pc) return
-    log(`Offer received from ${payload.from}`)
+    log(`Offer received from ${payload.from} — state: ${pc.signalingState}`)
+    // Ignorer si déjà en train de négocier
+    if (pc.signalingState !== 'stable') {
+      log(`Ignoring offer in state: ${pc.signalingState}`)
+      return
+    }
     setStatus('connecting')
-
-    await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+    } catch(e) {
+      log(`setRemoteDescription error: ${e.message}`)
+      return
+    }
 
     // Flush pending ICE
     for (const c of pendingIce.current) {
@@ -189,9 +198,19 @@ function Inner() {
 
   async function handleAnswer(payload) {
     const pc = pcRef.current
-    if (!pc || pc.signalingState !== 'have-local-offer') return
-    log('Answer received')
-    await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+    if (!pc) return
+    log(`Answer received — signalingState: ${pc.signalingState}`)
+    // Accepter seulement si on attend une réponse
+    if (pc.signalingState !== 'have-local-offer') {
+      log(`Ignoring answer in state: ${pc.signalingState}`)
+      return
+    }
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+      log('Remote description set (answer)')
+    } catch(e) {
+      log(`setRemoteDescription error: ${e.message}`)
+    }
   }
 
   async function handleIce(payload) {

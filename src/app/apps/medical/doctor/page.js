@@ -179,15 +179,14 @@ const CSS = `
   }
   .md-bn-item {
     flex: 1; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 3px;
-    cursor: pointer; padding: 6px 0;
-    color: var(--tx-3); font-size: .6rem; font-weight: 600;
-    letter-spacing: .03em; text-transform: uppercase;
+    align-items: center; justify-content: center; gap: 2px;
+    cursor: pointer; padding: 6px 2px; min-width: 0;
+    color: var(--tx-3); font-weight: 600;
     transition: color .15s; border: none; background: none;
-    position: relative;
+    position: relative; overflow: hidden;
   }
   .md-bn-item.active { color: #0EA5E9; }
-  .md-bn-item svg { width: 20px; height: 20px; }
+  .md-bn-item svg { width: 20px; height: 20px; flex-shrink: 0; }
   .md-bn-dot {
     position: absolute; top: 6px; right: 50%; transform: translateX(10px);
     width: 7px; height: 7px; border-radius: 50%;
@@ -1277,14 +1276,20 @@ export default function DoctorDashboard() {
           </main>
         </div>
 
-        {/* ── Bottom Nav (mobile) ── */}
+        {/* ── Bottom Nav (mobile) — max 5 items ── */}
         <div className="md-bottom-nav">
           <nav className="md-bn-inner">
-            {NAV.map(item => (
+            {[
+              { id:'dashboard',  icon:LayoutDashboard, label:'Accueil' },
+              { id:'patients',   icon:Users,           label:'Patients' },
+              { id:'creneaux',   icon:CalendarDays,    label:'Agenda' },
+              { id:'messages',   icon:MessageSquare,   label:'Messages', isLink:'/apps/medical/messagerie' },
+              { id:'more',       icon:Settings,        label:'Plus',     isLink:'/apps/medical/parametres' },
+            ].map(item => (
               <button key={item.id} className={`md-bn-item ${tab===item.id?'active':''}`}
                 onClick={() => item.isLink ? router.push(item.isLink) : setTab(item.id)}>
-                <item.icon />
-                {item.label.split(' ')[0]}
+                <item.icon size={20}/>
+                <span style={{fontSize:'.55rem',marginTop:2,fontWeight:600}}>{item.label}</span>
               </button>
             ))}
           </nav>
